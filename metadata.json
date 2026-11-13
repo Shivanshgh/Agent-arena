@@ -1,0 +1,6 @@
+{
+  "name": "AgentArena — AI Coding Agent Benchmark & Evaluation Arena",
+  "description": "Enterprise platform for registering, orchestrating, benchmarking, evaluating, and ranking autonomous AI coding agents under standardized protocols.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

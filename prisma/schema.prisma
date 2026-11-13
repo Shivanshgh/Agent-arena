@@ -1,0 +1,210 @@
+// AgentArena Prisma Schema
+// Compatible with PostgreSQL database
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum IntegrationType {
+  HTTP
+  DOCKER
+  SDK
+}
+
+enum ConnectionStatus {
+  CONNECTED
+  UNREACHABLE
+  ERROR
+  UNTESTED
+}
+
+enum AuthType {
+  NONE
+  BEARER
+  API_KEY
+  CUSTOM_HEADER
+}
+
+model Agent {
+  id                      String           @id @default(uuid())
+  name                    String
+  description             String?
+  version                 String           @default("1.0.0")
+  integrationType         IntegrationType  @default(HTTP)
+  endpoint                String
+  supportedLanguages      String[]         @default([])
+  supportedCapabilities   String[]         @default([])
+  
+  // Encrypted authentication credentials (never exposed via API)
+  authType                AuthType         @default(NONE)
+  authHeaderName          String?          // e.g. "Authorization" or "X-API-Key"
+  encryptedAuthSecret     String?          // AES-256-GCM encrypted payload
+  authSecretIv            String?          // Initialization vector
+  authSecretTag           String?          // Auth tag for GCM integrity
+  
+  connectionStatus        ConnectionStatus @default(UNTESTED)
+  lastSuccessfulConnection DateTime?
+  lastCheckedAt           DateTime?
+  lastErrorMessage        String?
+  
+  metadata                Json?            @default("{}")
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  connectionLogs          ConnectionLog[]
+  tasks                   AgentTask[]
+  executions              AgentExecution[]
+
+  @@index([connectionStatus])
+  @@index([name])
+}
+
+enum TaskDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  PARTIALLY_FAILED
+  FAILED
+}
+
+enum ExecutionStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  TIMED_OUT
+}
+
+model BenchmarkTask {
+  id                 String         @id @default(uuid())
+  title              String
+  description        String
+  language           String
+  category           String         @default("Algorithms")
+  difficulty         TaskDifficulty @default(MEDIUM)
+  inputData          Json           @default("{}")
+  expectedOutput     String?
+  timeoutSeconds     Int            @default(60)
+  maxOutputSizeBytes Int            @default(100000)
+  isActive           Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  runs               BenchmarkRun[]
+
+  @@index([language])
+  @@index([difficulty])
+}
+
+model BenchmarkRun {
+  id           String           @id @default(uuid())
+  title        String
+  taskId       String
+  task         BenchmarkTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  status       RunStatus        @default(QUEUED)
+  startedAt    DateTime         @default(now())
+  completedAt  DateTime?
+  durationMs   Int?
+  
+  executions   AgentExecution[]
+
+  @@index([taskId, status])
+}
+
+model AgentExecution {
+  id              String          @id @default(uuid())
+  runId           String
+  run             BenchmarkRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  agentId         String
+  agent           Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  requestId       String
+  status          ExecutionStatus @default(QUEUED)
+  startedAt       DateTime        @default(now())
+  completedAt     DateTime?
+  durationMs      Int?
+  inputTokens     Int?
+  outputTokens    Int?
+  errorMessage    String?
+  rawOutput       String?
+  files           Json?
+  metadata        Json?           @default("{}")
+
+  evaluations     ExecutionEvaluation[]
+
+  @@unique([runId, agentId])
+  @@unique([requestId])
+  @@index([runId, status])
+  @@index([agentId])
+}
+
+model ExecutionEvaluation {
+  id                   String          @id @default(uuid())
+  runId                String
+  executionId          String
+  execution            AgentExecution  @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  agentId              String
+  agent                Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  taskId               String
+  accuracyScore        Float           @default(0)
+  completionScore      Float           @default(0)
+  reliabilityScore     Float           @default(0)
+  speedScore           Float           @default(0)
+  costEfficiencyScore  Float?
+  overallScore         Float           @default(0)
+  passedTestCount      Int             @default(0)
+  failedTestCount      Int             @default(0)
+  totalTestCount       Int             @default(0)
+  evaluationStatus     String          @default("EVALUATED")
+  evaluationVersion    String          @default("1.0.0")
+  breakdown            Json            @default("{}")
+  createdAt            DateTime        @default(now())
+
+  @@index([runId])
+  @@unique([executionId])
+  @@index([executionId])
+  @@index([agentId])
+}
+
+model ConnectionLog {
+  id             String    @id @default(uuid())
+  agentId        String
+  agent          Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  testedAt       DateTime  @default(now())
+  success        Boolean
+  statusCode     Int?
+  latencyMs      Float?
+  resolvedIp     String?
+  errorMessage   String?
+  responseBody   Json?
+
+  @@index([agentId, testedAt])
+}
+
+model AgentTask {
+  id             String    @id @default(uuid())
+  agentId        String
+  agent          Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  protocolVersion String   @default("1.0")
+  taskTitle      String
+  taskLanguage   String
+  status         String    // queued, running, completed, failed, timed_out
+  durationMs     Int?
+  inputTokens    Int?
+  outputTokens   Int?
+  error          String?
+  responseContent String?
+  createdAt      DateTime  @default(now())
+
+  @@index([agentId, createdAt])
+}

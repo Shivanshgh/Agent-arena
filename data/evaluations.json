@@ -1,0 +1,116 @@
+[
+  {
+    "id": "eval-f66fc281-1b6c-4bdf-a8b7-52a629565ea8",
+    "runId": "run-1794496909482-d49d51",
+    "executionId": "exec-1794496909482-cce8cdc5",
+    "agentId": "agent-a3c7931a-0a85-4015-af7f-8e0f9491863d",
+    "agentName": "AgentArena Benchmark Agent Beta",
+    "taskId": "task-reverse-words",
+    "accuracyScore": 75,
+    "completionScore": 90,
+    "reliabilityScore": 100,
+    "speedScore": 100,
+    "costEfficiencyScore": 85,
+    "overallScore": 86,
+    "passedTestCount": 3,
+    "failedTestCount": 1,
+    "totalTestCount": 4,
+    "evaluationStatus": "EVALUATED",
+    "evaluationVersion": "1.0.0",
+    "breakdown": {
+      "accuracyDetails": "3/4 validation test cases passed (75%)",
+      "completionDetails": "Execution completed successfully with structured output (90%)",
+      "reliabilityDetails": "Reliable execution without errors or crash dumps (100%)",
+      "speedDetails": "Duration: 100ms against 30s timeout budget (100%)",
+      "costDetails": "Measured tokens: 364 (Input: 154, Output: 210) -> 85%",
+      "testCaseResults": [
+        {
+          "name": "Code Structure & Synthesis",
+          "passed": true,
+          "message": "Generated valid python solution structure (187 characters)"
+        },
+        {
+          "name": "Language Semantic Patterns",
+          "passed": true,
+          "message": "Code adheres to expected python syntax patterns"
+        },
+        {
+          "name": "Problem Domain Alignment",
+          "passed": true,
+          "message": "Solution aligns with task intent (reverse, words, string)"
+        },
+        {
+          "name": "Expected Output Alignment",
+          "passed": false,
+          "message": "Output does not contain target result pattern: blue is sky the",
+          "expected": "blue is sky the"
+        }
+      ],
+      "reNormalizedWeights": {
+        "accuracy": 0.4,
+        "completion": 0.25,
+        "reliability": 0.15,
+        "speed": 0.1,
+        "costEfficiency": 0.1
+      }
+    },
+    "evaluatedAt": "2026-11-12T15:39:57.376Z"
+  },
+  {
+    "id": "eval-02b6ae93-3423-453d-b1aa-f220ad72b059",
+    "runId": "run-1794496909482-d49d51",
+    "executionId": "exec-1794496909482-43c9dc04",
+    "agentId": "agent-mock-builtin",
+    "agentName": "AgentArena Reference Mock Agent",
+    "taskId": "task-reverse-words",
+    "accuracyScore": 75,
+    "completionScore": 90,
+    "reliabilityScore": 100,
+    "speedScore": 100,
+    "costEfficiencyScore": 85,
+    "overallScore": 86,
+    "passedTestCount": 3,
+    "failedTestCount": 1,
+    "totalTestCount": 4,
+    "evaluationStatus": "EVALUATED",
+    "evaluationVersion": "1.0.0",
+    "breakdown": {
+      "accuracyDetails": "3/4 validation test cases passed (75%)",
+      "completionDetails": "Execution completed successfully with structured output (90%)",
+      "reliabilityDetails": "Reliable execution without errors or crash dumps (100%)",
+      "speedDetails": "Duration: 96ms against 30s timeout budget (100%)",
+      "costDetails": "Measured tokens: 364 (Input: 154, Output: 210) -> 85%",
+      "testCaseResults": [
+        {
+          "name": "Code Structure & Synthesis",
+          "passed": true,
+          "message": "Generated valid python solution structure (187 characters)"
+        },
+        {
+          "name": "Language Semantic Patterns",
+          "passed": true,
+          "message": "Code adheres to expected python syntax patterns"
+        },
+        {
+          "name": "Problem Domain Alignment",
+          "passed": true,
+          "message": "Solution aligns with task intent (reverse, words, string)"
+        },
+        {
+          "name": "Expected Output Alignment",
+          "passed": false,
+          "message": "Output does not contain target result pattern: blue is sky the",
+          "expected": "blue is sky the"
+        }
+      ],
+      "reNormalizedWeights": {
+        "accuracy": 0.4,
+        "completion": 0.25,
+        "reliability": 0.15,
+        "speed": 0.1,
+        "costEfficiency": 0.1
+      }
+    },
+    "evaluatedAt": "2026-11-12T15:39:57.376Z"
+  }
+]

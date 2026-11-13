@@ -1,0 +1,1250 @@
+[
+  {
+    "id": "run-fixture-stage6-1794500225307",
+    "title": "Stage 6 Leaderboard Benchmark Fixture",
+    "taskId": "task-two-sum",
+    "taskTitle": "Two Sum Problem",
+    "taskLanguage": "typescript",
+    "taskDescription": "Solve two sum",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-mock-builtin",
+      "agent-fixture-b"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T16:17:05.307Z",
+    "completedAt": "2026-11-12T16:17:05.307Z",
+    "durationMs": 120,
+    "executions": [
+      {
+        "id": "exec-s6-1",
+        "runId": "run-fixture-stage6-1794500225307",
+        "agentId": "agent-mock-builtin",
+        "agentName": "AgentArena Reference Mock Agent",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent",
+        "requestId": "req-s6-1",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:17:05.307Z",
+        "completedAt": "2026-11-12T16:17:05.307Z",
+        "durationMs": 90,
+        "inputTokens": 100,
+        "outputTokens": 150,
+        "errorMessage": null,
+        "rawOutput": "function twoSum() { return [0, 1]; }",
+        "metadata": {}
+      },
+      {
+        "id": "exec-s6-2",
+        "runId": "run-fixture-stage6-1794500225307",
+        "agentId": "agent-fixture-b",
+        "agentName": "Challenger Agent Beta",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent-b",
+        "requestId": "req-s6-2",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:17:05.307Z",
+        "completedAt": "2026-11-12T16:17:05.307Z",
+        "durationMs": 150,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "function twoSum() { return [0, 1]; }",
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T16:17:05.307Z"
+  },
+  {
+    "id": "run-1794500222481-d1a8f7",
+    "title": "Reliability Test: Healthy vs Crashing Agent",
+    "taskId": "task-0bcb038f-7ae1-48a0-8bc3-e50c05054239",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-e44e4362-f5fd-442d-b15c-95092f5d8ed3",
+      "agent-afad4516-8fd6-4799-8afa-05fd6a62d445"
+    ],
+    "status": "PARTIALLY_FAILED",
+    "startedAt": "2026-11-12T16:17:02.481Z",
+    "completedAt": "2026-11-12T16:17:02.493Z",
+    "durationMs": 12,
+    "executions": [
+      {
+        "id": "exec-1794500222481-9ecb0b74",
+        "runId": "run-1794500222481-d1a8f7",
+        "agentId": "agent-e44e4362-f5fd-442d-b15c-95092f5d8ed3",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:35072/agent-a",
+        "requestId": "req-run-1794500222481-d1a8f7-agent-e44e4362-f5fd-442d-b15c-95092f5d8ed3",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:17:02.482Z",
+        "completedAt": "2026-11-12T16:17:02.490Z",
+        "durationMs": 7,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794500222481-793decd5",
+        "runId": "run-1794500222481-d1a8f7",
+        "agentId": "agent-afad4516-8fd6-4799-8afa-05fd6a62d445",
+        "agentName": "Stage4 Failing Agent",
+        "agentEndpoint": "http://127.0.0.1:35072/agent-fail",
+        "requestId": "req-run-1794500222481-d1a8f7-agent-afad4516-8fd6-4799-8afa-05fd6a62d445",
+        "status": "FAILED",
+        "startedAt": "2026-11-12T16:17:02.483Z",
+        "completedAt": "2026-11-12T16:17:02.492Z",
+        "durationMs": 9,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": "Agent returned HTTP error 500: {\"error\":\"Crash inside agent pipeline\"}",
+        "rawOutput": null,
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T16:17:02.481Z"
+  },
+  {
+    "id": "run-1794500222389-68206f",
+    "title": "Two Sum Head-to-Head Battle",
+    "taskId": "task-0bcb038f-7ae1-48a0-8bc3-e50c05054239",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-e44e4362-f5fd-442d-b15c-95092f5d8ed3",
+      "agent-9da1ffbf-0098-42df-86ad-de8c7064906a"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T16:17:02.389Z",
+    "completedAt": "2026-11-12T16:17:02.478Z",
+    "durationMs": 89,
+    "executions": [
+      {
+        "id": "exec-1794500222389-f574ae96",
+        "runId": "run-1794500222389-68206f",
+        "agentId": "agent-e44e4362-f5fd-442d-b15c-95092f5d8ed3",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:35072/agent-a",
+        "requestId": "req-run-1794500222389-68206f-agent-e44e4362-f5fd-442d-b15c-95092f5d8ed3",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:17:02.391Z",
+        "completedAt": "2026-11-12T16:17:02.475Z",
+        "durationMs": 72,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794500222389-9314c4d1",
+        "runId": "run-1794500222389-68206f",
+        "agentId": "agent-9da1ffbf-0098-42df-86ad-de8c7064906a",
+        "agentName": "Stage4 Test Agent Beta",
+        "agentEndpoint": "http://127.0.0.1:35072/agent-b",
+        "requestId": "req-run-1794500222389-68206f-agent-9da1ffbf-0098-42df-86ad-de8c7064906a",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:17:02.400Z",
+        "completedAt": "2026-11-12T16:17:02.478Z",
+        "durationMs": 74,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "def solve(): return \"Solution from Beta\"",
+        "metadata": {
+          "agent": "Agent Beta"
+        }
+      }
+    ],
+    "createdAt": "2026-11-12T16:17:02.389Z"
+  },
+  {
+    "id": "run-fixture-stage6-1794499948239",
+    "title": "Stage 6 Leaderboard Benchmark Fixture",
+    "taskId": "task-two-sum",
+    "taskTitle": "Two Sum Problem",
+    "taskLanguage": "typescript",
+    "taskDescription": "Solve two sum",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-mock-builtin",
+      "agent-fixture-b"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T16:12:28.239Z",
+    "completedAt": "2026-11-12T16:12:28.239Z",
+    "durationMs": 120,
+    "executions": [
+      {
+        "id": "exec-s6-1",
+        "runId": "run-fixture-stage6-1794499948239",
+        "agentId": "agent-mock-builtin",
+        "agentName": "AgentArena Reference Mock Agent",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent",
+        "requestId": "req-s6-1",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:12:28.239Z",
+        "completedAt": "2026-11-12T16:12:28.239Z",
+        "durationMs": 90,
+        "inputTokens": 100,
+        "outputTokens": 150,
+        "errorMessage": null,
+        "rawOutput": "function twoSum() { return [0, 1]; }",
+        "metadata": {}
+      },
+      {
+        "id": "exec-s6-2",
+        "runId": "run-fixture-stage6-1794499948239",
+        "agentId": "agent-fixture-b",
+        "agentName": "Challenger Agent Beta",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent-b",
+        "requestId": "req-s6-2",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:12:28.239Z",
+        "completedAt": "2026-11-12T16:12:28.239Z",
+        "durationMs": 150,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "function twoSum() { return [0, 1]; }",
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T16:12:28.239Z"
+  },
+  {
+    "id": "run-fixture-stage6-1794499565625",
+    "title": "Stage 6 Leaderboard Benchmark Fixture",
+    "taskId": "task-two-sum",
+    "taskTitle": "Two Sum Problem",
+    "taskLanguage": "typescript",
+    "taskDescription": "Solve two sum",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-mock-builtin",
+      "agent-fixture-b"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T16:06:05.625Z",
+    "completedAt": "2026-11-12T16:06:05.625Z",
+    "durationMs": 120,
+    "executions": [
+      {
+        "id": "exec-s6-1",
+        "runId": "run-fixture-stage6-1794499565625",
+        "agentId": "agent-mock-builtin",
+        "agentName": "AgentArena Reference Mock Agent",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent",
+        "requestId": "req-s6-1",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:06:05.625Z",
+        "completedAt": "2026-11-12T16:06:05.625Z",
+        "durationMs": 90,
+        "inputTokens": 100,
+        "outputTokens": 150,
+        "errorMessage": null,
+        "rawOutput": "function twoSum() { return [0, 1]; }",
+        "metadata": {}
+      },
+      {
+        "id": "exec-s6-2",
+        "runId": "run-fixture-stage6-1794499565625",
+        "agentId": "agent-fixture-b",
+        "agentName": "Challenger Agent Beta",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent-b",
+        "requestId": "req-s6-2",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:06:05.625Z",
+        "completedAt": "2026-11-12T16:06:05.625Z",
+        "durationMs": 150,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "function twoSum() { return [0, 1]; }",
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T16:06:05.625Z"
+  },
+  {
+    "id": "run-1794499554674-18fc6e",
+    "title": "Reliability Test: Healthy vs Crashing Agent",
+    "taskId": "task-af880873-f61b-4f13-81cf-d8c68c73089d",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-9040bc07-3bff-478b-bfa1-7a2241e263fe",
+      "agent-bbc1d310-fb14-4088-96c9-792d6dbfb2b4"
+    ],
+    "status": "PARTIALLY_FAILED",
+    "startedAt": "2026-11-12T16:05:54.674Z",
+    "completedAt": "2026-11-12T16:05:54.685Z",
+    "durationMs": 11,
+    "executions": [
+      {
+        "id": "exec-1794499554674-8f4653a3",
+        "runId": "run-1794499554674-18fc6e",
+        "agentId": "agent-9040bc07-3bff-478b-bfa1-7a2241e263fe",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:44357/agent-a",
+        "requestId": "req-run-1794499554674-18fc6e-agent-9040bc07-3bff-478b-bfa1-7a2241e263fe",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:05:54.674Z",
+        "completedAt": "2026-11-12T16:05:54.683Z",
+        "durationMs": 7,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794499554674-75809440",
+        "runId": "run-1794499554674-18fc6e",
+        "agentId": "agent-bbc1d310-fb14-4088-96c9-792d6dbfb2b4",
+        "agentName": "Stage4 Failing Agent",
+        "agentEndpoint": "http://127.0.0.1:44357/agent-fail",
+        "requestId": "req-run-1794499554674-18fc6e-agent-bbc1d310-fb14-4088-96c9-792d6dbfb2b4",
+        "status": "FAILED",
+        "startedAt": "2026-11-12T16:05:54.675Z",
+        "completedAt": "2026-11-12T16:05:54.685Z",
+        "durationMs": 9,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": "Agent returned HTTP error 500: {\"error\":\"Crash inside agent pipeline\"}",
+        "rawOutput": null,
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T16:05:54.674Z"
+  },
+  {
+    "id": "run-1794499554605-e31ca9",
+    "title": "Two Sum Head-to-Head Battle",
+    "taskId": "task-af880873-f61b-4f13-81cf-d8c68c73089d",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-9040bc07-3bff-478b-bfa1-7a2241e263fe",
+      "agent-1b1d26fe-192f-4c2b-b97f-f873147c4617"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T16:05:54.605Z",
+    "completedAt": "2026-11-12T16:05:54.671Z",
+    "durationMs": 66,
+    "executions": [
+      {
+        "id": "exec-1794499554605-8ed6be16",
+        "runId": "run-1794499554605-e31ca9",
+        "agentId": "agent-9040bc07-3bff-478b-bfa1-7a2241e263fe",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:44357/agent-a",
+        "requestId": "req-run-1794499554605-e31ca9-agent-9040bc07-3bff-478b-bfa1-7a2241e263fe",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:05:54.606Z",
+        "completedAt": "2026-11-12T16:05:54.669Z",
+        "durationMs": 53,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794499554605-58ead0e2",
+        "runId": "run-1794499554605-e31ca9",
+        "agentId": "agent-1b1d26fe-192f-4c2b-b97f-f873147c4617",
+        "agentName": "Stage4 Test Agent Beta",
+        "agentEndpoint": "http://127.0.0.1:44357/agent-b",
+        "requestId": "req-run-1794499554605-e31ca9-agent-1b1d26fe-192f-4c2b-b97f-f873147c4617",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T16:05:54.612Z",
+        "completedAt": "2026-11-12T16:05:54.671Z",
+        "durationMs": 58,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "def solve(): return \"Solution from Beta\"",
+        "metadata": {
+          "agent": "Agent Beta"
+        }
+      }
+    ],
+    "createdAt": "2026-11-12T16:05:54.605Z"
+  },
+  {
+    "id": "run-fixture-stage6-1794499079246",
+    "title": "Stage 6 Leaderboard Benchmark Fixture",
+    "taskId": "task-two-sum",
+    "taskTitle": "Two Sum Problem",
+    "taskLanguage": "typescript",
+    "taskDescription": "Solve two sum",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-mock-builtin",
+      "agent-fixture-b"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T15:57:59.246Z",
+    "completedAt": "2026-11-12T15:57:59.246Z",
+    "durationMs": 120,
+    "executions": [
+      {
+        "id": "exec-s6-1",
+        "runId": "run-fixture-stage6-1794499079246",
+        "agentId": "agent-mock-builtin",
+        "agentName": "AgentArena Reference Mock Agent",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent",
+        "requestId": "req-s6-1",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:57:59.246Z",
+        "completedAt": "2026-11-12T15:57:59.246Z",
+        "durationMs": 90,
+        "inputTokens": 100,
+        "outputTokens": 150,
+        "errorMessage": null,
+        "rawOutput": "function twoSum() { return [0, 1]; }",
+        "metadata": {}
+      },
+      {
+        "id": "exec-s6-2",
+        "runId": "run-fixture-stage6-1794499079246",
+        "agentId": "agent-fixture-b",
+        "agentName": "Challenger Agent Beta",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent-b",
+        "requestId": "req-s6-2",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:57:59.246Z",
+        "completedAt": "2026-11-12T15:57:59.246Z",
+        "durationMs": 150,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "function twoSum() { return [0, 1]; }",
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T15:57:59.246Z"
+  },
+  {
+    "id": "run-1794499076700-ebdd50",
+    "title": "Reliability Test: Healthy vs Crashing Agent",
+    "taskId": "task-96ef39f6-85d7-4563-98c5-c73189f13f7f",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-cb4e2a6c-d882-4c0b-b80c-f8bad8523d9c",
+      "agent-84feec49-d32c-4818-b4ca-c759ad90fe82"
+    ],
+    "status": "PARTIALLY_FAILED",
+    "startedAt": "2026-11-12T15:57:56.700Z",
+    "completedAt": "2026-11-12T15:57:56.710Z",
+    "durationMs": 10,
+    "executions": [
+      {
+        "id": "exec-1794499076700-3f294f8b",
+        "runId": "run-1794499076700-ebdd50",
+        "agentId": "agent-cb4e2a6c-d882-4c0b-b80c-f8bad8523d9c",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:31620/agent-a",
+        "requestId": "req-run-1794499076700-ebdd50-agent-cb4e2a6c-d882-4c0b-b80c-f8bad8523d9c",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:57:56.700Z",
+        "completedAt": "2026-11-12T15:57:56.708Z",
+        "durationMs": 6,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794499076700-37e2526d",
+        "runId": "run-1794499076700-ebdd50",
+        "agentId": "agent-84feec49-d32c-4818-b4ca-c759ad90fe82",
+        "agentName": "Stage4 Failing Agent",
+        "agentEndpoint": "http://127.0.0.1:31620/agent-fail",
+        "requestId": "req-run-1794499076700-ebdd50-agent-84feec49-d32c-4818-b4ca-c759ad90fe82",
+        "status": "FAILED",
+        "startedAt": "2026-11-12T15:57:56.701Z",
+        "completedAt": "2026-11-12T15:57:56.710Z",
+        "durationMs": 8,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": "Agent returned HTTP error 500: {\"error\":\"Crash inside agent pipeline\"}",
+        "rawOutput": null,
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T15:57:56.700Z"
+  },
+  {
+    "id": "run-1794499076633-6ef750",
+    "title": "Two Sum Head-to-Head Battle",
+    "taskId": "task-96ef39f6-85d7-4563-98c5-c73189f13f7f",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-cb4e2a6c-d882-4c0b-b80c-f8bad8523d9c",
+      "agent-b4a599d3-8523-40bb-b1b1-d0a8177d3267"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T15:57:56.633Z",
+    "completedAt": "2026-11-12T15:57:56.697Z",
+    "durationMs": 64,
+    "executions": [
+      {
+        "id": "exec-1794499076633-5ec55b02",
+        "runId": "run-1794499076633-6ef750",
+        "agentId": "agent-cb4e2a6c-d882-4c0b-b80c-f8bad8523d9c",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:31620/agent-a",
+        "requestId": "req-run-1794499076633-6ef750-agent-cb4e2a6c-d882-4c0b-b80c-f8bad8523d9c",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:57:56.635Z",
+        "completedAt": "2026-11-12T15:57:56.693Z",
+        "durationMs": 48,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794499076633-b9e525c4",
+        "runId": "run-1794499076633-6ef750",
+        "agentId": "agent-b4a599d3-8523-40bb-b1b1-d0a8177d3267",
+        "agentName": "Stage4 Test Agent Beta",
+        "agentEndpoint": "http://127.0.0.1:31620/agent-b",
+        "requestId": "req-run-1794499076633-6ef750-agent-b4a599d3-8523-40bb-b1b1-d0a8177d3267",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:57:56.642Z",
+        "completedAt": "2026-11-12T15:57:56.697Z",
+        "durationMs": 54,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "def solve(): return \"Solution from Beta\"",
+        "metadata": {
+          "agent": "Agent Beta"
+        }
+      }
+    ],
+    "createdAt": "2026-11-12T15:57:56.633Z"
+  },
+  {
+    "id": "run-fixture-stage6-1794499051920",
+    "title": "Stage 6 Leaderboard Benchmark Fixture",
+    "taskId": "task-two-sum",
+    "taskTitle": "Two Sum Problem",
+    "taskLanguage": "typescript",
+    "taskDescription": "Solve two sum",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-mock-builtin",
+      "agent-fixture-b"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T15:57:31.920Z",
+    "completedAt": "2026-11-12T15:57:31.920Z",
+    "durationMs": 120,
+    "executions": [
+      {
+        "id": "exec-s6-1",
+        "runId": "run-fixture-stage6-1794499051920",
+        "agentId": "agent-mock-builtin",
+        "agentName": "AgentArena Reference Mock Agent",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent",
+        "requestId": "req-s6-1",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:57:31.920Z",
+        "completedAt": "2026-11-12T15:57:31.920Z",
+        "durationMs": 90,
+        "inputTokens": 100,
+        "outputTokens": 150,
+        "errorMessage": null,
+        "rawOutput": "function twoSum() { return [0, 1]; }",
+        "metadata": {}
+      },
+      {
+        "id": "exec-s6-2",
+        "runId": "run-fixture-stage6-1794499051920",
+        "agentId": "agent-fixture-b",
+        "agentName": "Challenger Agent Beta",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent-b",
+        "requestId": "req-s6-2",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:57:31.920Z",
+        "completedAt": "2026-11-12T15:57:31.920Z",
+        "durationMs": 150,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "function twoSum() { return [0, 1]; }",
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T15:57:31.920Z"
+  },
+  {
+    "id": "run-1794498009871-babe19",
+    "title": "Reliability Test: Healthy vs Crashing Agent",
+    "taskId": "task-d9806660-237f-46ee-817a-a178644a828f",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-f471dc28-5bd9-40e1-953c-30ae5749c009",
+      "agent-eb8d1259-62e9-4946-af03-401501bde56a"
+    ],
+    "status": "PARTIALLY_FAILED",
+    "startedAt": "2026-11-12T15:40:09.871Z",
+    "completedAt": "2026-11-12T15:40:09.886Z",
+    "durationMs": 15,
+    "executions": [
+      {
+        "id": "exec-1794498009871-9de67b5d",
+        "runId": "run-1794498009871-babe19",
+        "agentId": "agent-f471dc28-5bd9-40e1-953c-30ae5749c009",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:37482/agent-a",
+        "requestId": "req-run-1794498009871-babe19-agent-f471dc28-5bd9-40e1-953c-30ae5749c009",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:40:09.871Z",
+        "completedAt": "2026-11-12T15:40:09.884Z",
+        "durationMs": 12,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794498009871-c606fce1",
+        "runId": "run-1794498009871-babe19",
+        "agentId": "agent-eb8d1259-62e9-4946-af03-401501bde56a",
+        "agentName": "Stage4 Failing Agent",
+        "agentEndpoint": "http://127.0.0.1:37482/agent-fail",
+        "requestId": "req-run-1794498009871-babe19-agent-eb8d1259-62e9-4946-af03-401501bde56a",
+        "status": "FAILED",
+        "startedAt": "2026-11-12T15:40:09.872Z",
+        "completedAt": "2026-11-12T15:40:09.886Z",
+        "durationMs": 14,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": "Agent returned HTTP error 500: {\"error\":\"Crash inside agent pipeline\"}",
+        "rawOutput": null,
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T15:40:09.871Z"
+  },
+  {
+    "id": "run-1794498009815-fa7d79",
+    "title": "Two Sum Head-to-Head Battle",
+    "taskId": "task-d9806660-237f-46ee-817a-a178644a828f",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-f471dc28-5bd9-40e1-953c-30ae5749c009",
+      "agent-f95a70ca-8213-44ee-8638-0fa50876951f"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T15:40:09.815Z",
+    "completedAt": "2026-11-12T15:40:09.868Z",
+    "durationMs": 53,
+    "executions": [
+      {
+        "id": "exec-1794498009815-da0c017b",
+        "runId": "run-1794498009815-fa7d79",
+        "agentId": "agent-f471dc28-5bd9-40e1-953c-30ae5749c009",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:37482/agent-a",
+        "requestId": "req-run-1794498009815-fa7d79-agent-f471dc28-5bd9-40e1-953c-30ae5749c009",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:40:09.816Z",
+        "completedAt": "2026-11-12T15:40:09.866Z",
+        "durationMs": 41,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794498009815-55b56b11",
+        "runId": "run-1794498009815-fa7d79",
+        "agentId": "agent-f95a70ca-8213-44ee-8638-0fa50876951f",
+        "agentName": "Stage4 Test Agent Beta",
+        "agentEndpoint": "http://127.0.0.1:37482/agent-b",
+        "requestId": "req-run-1794498009815-fa7d79-agent-f95a70ca-8213-44ee-8638-0fa50876951f",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:40:09.822Z",
+        "completedAt": "2026-11-12T15:40:09.868Z",
+        "durationMs": 45,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "def solve(): return \"Solution from Beta\"",
+        "metadata": {
+          "agent": "Agent Beta"
+        }
+      }
+    ],
+    "createdAt": "2026-11-12T15:40:09.815Z"
+  },
+  {
+    "id": "run-1794497877301-72197e",
+    "title": "Reliability Test: Healthy vs Crashing Agent",
+    "taskId": "task-de769786-6b05-41a6-a430-fe59077ec583",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-a8a762ff-2819-42cc-ac8e-73a9a31bef5b",
+      "agent-82858cd8-39c5-46d4-abd7-ea24c50cf59a"
+    ],
+    "status": "PARTIALLY_FAILED",
+    "startedAt": "2026-11-12T15:37:57.301Z",
+    "completedAt": "2026-11-12T15:37:57.311Z",
+    "durationMs": 10,
+    "executions": [
+      {
+        "id": "exec-1794497877301-675f0985",
+        "runId": "run-1794497877301-72197e",
+        "agentId": "agent-a8a762ff-2819-42cc-ac8e-73a9a31bef5b",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:41166/agent-a",
+        "requestId": "req-run-1794497877301-72197e-agent-a8a762ff-2819-42cc-ac8e-73a9a31bef5b",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:37:57.302Z",
+        "completedAt": "2026-11-12T15:37:57.311Z",
+        "durationMs": 9,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794497877301-5fc607d8",
+        "runId": "run-1794497877301-72197e",
+        "agentId": "agent-82858cd8-39c5-46d4-abd7-ea24c50cf59a",
+        "agentName": "Stage4 Failing Agent",
+        "agentEndpoint": "http://127.0.0.1:41166/agent-fail",
+        "requestId": "req-run-1794497877301-72197e-agent-82858cd8-39c5-46d4-abd7-ea24c50cf59a",
+        "status": "FAILED",
+        "startedAt": "2026-11-12T15:37:57.302Z",
+        "completedAt": "2026-11-12T15:37:57.310Z",
+        "durationMs": 7,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": "Agent returned HTTP error 500: {\"error\":\"Crash inside agent pipeline\"}",
+        "rawOutput": null,
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T15:37:57.301Z"
+  },
+  {
+    "id": "run-1794497877236-beba66",
+    "title": "Two Sum Head-to-Head Battle",
+    "taskId": "task-de769786-6b05-41a6-a430-fe59077ec583",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-a8a762ff-2819-42cc-ac8e-73a9a31bef5b",
+      "agent-a58f2c53-2d60-4194-983e-625166b00ca7"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T15:37:57.236Z",
+    "completedAt": "2026-11-12T15:37:57.299Z",
+    "durationMs": 63,
+    "executions": [
+      {
+        "id": "exec-1794497877236-e24f5e07",
+        "runId": "run-1794497877236-beba66",
+        "agentId": "agent-a8a762ff-2819-42cc-ac8e-73a9a31bef5b",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:41166/agent-a",
+        "requestId": "req-run-1794497877236-beba66-agent-a8a762ff-2819-42cc-ac8e-73a9a31bef5b",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:37:57.237Z",
+        "completedAt": "2026-11-12T15:37:57.296Z",
+        "durationMs": 49,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794497877236-7f97855d",
+        "runId": "run-1794497877236-beba66",
+        "agentId": "agent-a58f2c53-2d60-4194-983e-625166b00ca7",
+        "agentName": "Stage4 Test Agent Beta",
+        "agentEndpoint": "http://127.0.0.1:41166/agent-b",
+        "requestId": "req-run-1794497877236-beba66-agent-a58f2c53-2d60-4194-983e-625166b00ca7",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:37:57.244Z",
+        "completedAt": "2026-11-12T15:37:57.299Z",
+        "durationMs": 54,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "def solve(): return \"Solution from Beta\"",
+        "metadata": {
+          "agent": "Agent Beta"
+        }
+      }
+    ],
+    "createdAt": "2026-11-12T15:37:57.236Z"
+  },
+  {
+    "id": "run-1794497706353-ab81b9",
+    "title": "Reliability Test: Healthy vs Crashing Agent",
+    "taskId": "task-7b85676f-1ddd-4bde-a539-e5703245bd82",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-c805c273-6c82-43bf-b37c-ebb16397f040",
+      "agent-4e57c512-2019-4281-a334-4b6852454e9c"
+    ],
+    "status": "PARTIALLY_FAILED",
+    "startedAt": "2026-11-12T15:35:06.353Z",
+    "completedAt": "2026-11-12T15:35:06.363Z",
+    "durationMs": 10,
+    "executions": [
+      {
+        "id": "exec-1794497706353-010d41b2",
+        "runId": "run-1794497706353-ab81b9",
+        "agentId": "agent-c805c273-6c82-43bf-b37c-ebb16397f040",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:48514/agent-a",
+        "requestId": "req-run-1794497706353-ab81b9-agent-c805c273-6c82-43bf-b37c-ebb16397f040",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:35:06.354Z",
+        "completedAt": "2026-11-12T15:35:06.363Z",
+        "durationMs": 9,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794497706353-3fc3406d",
+        "runId": "run-1794497706353-ab81b9",
+        "agentId": "agent-4e57c512-2019-4281-a334-4b6852454e9c",
+        "agentName": "Stage4 Failing Agent",
+        "agentEndpoint": "http://127.0.0.1:48514/agent-fail",
+        "requestId": "req-run-1794497706353-ab81b9-agent-4e57c512-2019-4281-a334-4b6852454e9c",
+        "status": "FAILED",
+        "startedAt": "2026-11-12T15:35:06.354Z",
+        "completedAt": "2026-11-12T15:35:06.361Z",
+        "durationMs": 6,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": "Agent returned HTTP error 500: {\"error\":\"Crash inside agent pipeline\"}",
+        "rawOutput": null,
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T15:35:06.353Z"
+  },
+  {
+    "id": "run-1794497706277-cb173c",
+    "title": "Two Sum Head-to-Head Battle",
+    "taskId": "task-7b85676f-1ddd-4bde-a539-e5703245bd82",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-c805c273-6c82-43bf-b37c-ebb16397f040",
+      "agent-6ecaa761-fee2-4bd3-9f2a-935d8ac8de95"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T15:35:06.277Z",
+    "completedAt": "2026-11-12T15:35:06.351Z",
+    "durationMs": 74,
+    "executions": [
+      {
+        "id": "exec-1794497706278-8853876e",
+        "runId": "run-1794497706277-cb173c",
+        "agentId": "agent-c805c273-6c82-43bf-b37c-ebb16397f040",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:48514/agent-a",
+        "requestId": "req-run-1794497706277-cb173c-agent-c805c273-6c82-43bf-b37c-ebb16397f040",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:35:06.279Z",
+        "completedAt": "2026-11-12T15:35:06.349Z",
+        "durationMs": 60,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794497706278-bed233bc",
+        "runId": "run-1794497706277-cb173c",
+        "agentId": "agent-6ecaa761-fee2-4bd3-9f2a-935d8ac8de95",
+        "agentName": "Stage4 Test Agent Beta",
+        "agentEndpoint": "http://127.0.0.1:48514/agent-b",
+        "requestId": "req-run-1794497706277-cb173c-agent-6ecaa761-fee2-4bd3-9f2a-935d8ac8de95",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:35:06.286Z",
+        "completedAt": "2026-11-12T15:35:06.351Z",
+        "durationMs": 64,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "def solve(): return \"Solution from Beta\"",
+        "metadata": {
+          "agent": "Agent Beta"
+        }
+      }
+    ],
+    "createdAt": "2026-11-12T15:35:06.277Z"
+  },
+  {
+    "id": "run-1794496923472-8b2b6d",
+    "title": "Reliability Test: Healthy vs Crashing Agent",
+    "taskId": "task-e32333af-3a69-4ac4-add0-7e89b1a905a1",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-161aa950-eb75-4dd7-86fe-3c823dd613da",
+      "agent-8d03949b-19b1-4721-b5ba-d20e465d241e"
+    ],
+    "status": "PARTIALLY_FAILED",
+    "startedAt": "2026-11-12T15:22:03.472Z",
+    "completedAt": "2026-11-12T15:22:03.484Z",
+    "durationMs": 12,
+    "executions": [
+      {
+        "id": "exec-1794496923472-754b61ca",
+        "runId": "run-1794496923472-8b2b6d",
+        "agentId": "agent-161aa950-eb75-4dd7-86fe-3c823dd613da",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:58450/agent-a",
+        "requestId": "req-run-1794496923472-8b2b6d-agent-161aa950-eb75-4dd7-86fe-3c823dd613da",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:22:03.472Z",
+        "completedAt": "2026-11-12T15:22:03.482Z",
+        "durationMs": 8,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794496923472-67c7f2f1",
+        "runId": "run-1794496923472-8b2b6d",
+        "agentId": "agent-8d03949b-19b1-4721-b5ba-d20e465d241e",
+        "agentName": "Stage4 Failing Agent",
+        "agentEndpoint": "http://127.0.0.1:58450/agent-fail",
+        "requestId": "req-run-1794496923472-8b2b6d-agent-8d03949b-19b1-4721-b5ba-d20e465d241e",
+        "status": "FAILED",
+        "startedAt": "2026-11-12T15:22:03.473Z",
+        "completedAt": "2026-11-12T15:22:03.484Z",
+        "durationMs": 10,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": "Agent returned HTTP error 500: {\"error\":\"Crash inside agent pipeline\"}",
+        "rawOutput": null,
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T15:22:03.472Z"
+  },
+  {
+    "id": "run-1794496923391-cf0821",
+    "title": "Two Sum Head-to-Head Battle",
+    "taskId": "task-e32333af-3a69-4ac4-add0-7e89b1a905a1",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-161aa950-eb75-4dd7-86fe-3c823dd613da",
+      "agent-c9ae3951-e4bf-4908-a935-3131703a0168"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T15:22:03.391Z",
+    "completedAt": "2026-11-12T15:22:03.468Z",
+    "durationMs": 77,
+    "executions": [
+      {
+        "id": "exec-1794496923391-5627a7a8",
+        "runId": "run-1794496923391-cf0821",
+        "agentId": "agent-161aa950-eb75-4dd7-86fe-3c823dd613da",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:58450/agent-a",
+        "requestId": "req-run-1794496923391-cf0821-agent-161aa950-eb75-4dd7-86fe-3c823dd613da",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:22:03.392Z",
+        "completedAt": "2026-11-12T15:22:03.465Z",
+        "durationMs": 63,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794496923391-dfd988c2",
+        "runId": "run-1794496923391-cf0821",
+        "agentId": "agent-c9ae3951-e4bf-4908-a935-3131703a0168",
+        "agentName": "Stage4 Test Agent Beta",
+        "agentEndpoint": "http://127.0.0.1:58450/agent-b",
+        "requestId": "req-run-1794496923391-cf0821-agent-c9ae3951-e4bf-4908-a935-3131703a0168",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:22:03.398Z",
+        "completedAt": "2026-11-12T15:22:03.468Z",
+        "durationMs": 69,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "def solve(): return \"Solution from Beta\"",
+        "metadata": {
+          "agent": "Agent Beta"
+        }
+      }
+    ],
+    "createdAt": "2026-11-12T15:22:03.391Z"
+  },
+  {
+    "id": "run-1794496909482-d49d51",
+    "title": "Battle: Reverse Words Showdown",
+    "taskId": "task-reverse-words",
+    "taskTitle": "Reverse Words in String",
+    "taskLanguage": "python",
+    "taskDescription": "Given an input string s, reverse the order of the words while trimming excess spaces.",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-mock-builtin",
+      "agent-a3c7931a-0a85-4015-af7f-8e0f9491863d"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T15:21:49.482Z",
+    "completedAt": "2026-11-12T15:21:49.589Z",
+    "durationMs": 107,
+    "executions": [
+      {
+        "id": "exec-1794496909482-43c9dc04",
+        "runId": "run-1794496909482-d49d51",
+        "agentId": "agent-mock-builtin",
+        "agentName": "AgentArena Reference Mock Agent",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent",
+        "requestId": "req-run-1794496909482-d49d51-agent-mock-builtin",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:21:49.483Z",
+        "completedAt": "2026-11-12T15:21:49.587Z",
+        "durationMs": 96,
+        "inputTokens": 154,
+        "outputTokens": 210,
+        "errorMessage": null,
+        "rawOutput": "def solution(input_data):\n    # Generated by AgentArena Reference Mock Agent\n    # Task: Reverse Words in String\n    return input_data[::-1] if isinstance(input_data, str) else input_data\n",
+        "metadata": {
+          "model": "AgentArena-Mock-v1",
+          "evaluatedTask": "task-reverse-words"
+        },
+        "files": {
+          "solution.py": "def solution(input_data):\n    # Generated by AgentArena Reference Mock Agent\n    # Task: Reverse Words in String\n    return input_data[::-1] if isinstance(input_data, str) else input_data\n"
+        }
+      },
+      {
+        "id": "exec-1794496909482-cce8cdc5",
+        "runId": "run-1794496909482-d49d51",
+        "agentId": "agent-a3c7931a-0a85-4015-af7f-8e0f9491863d",
+        "agentName": "AgentArena Benchmark Agent Beta",
+        "agentEndpoint": "http://localhost:3000/api/mock-agent",
+        "requestId": "req-run-1794496909482-d49d51-agent-a3c7931a-0a85-4015-af7f-8e0f9491863d",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:21:49.488Z",
+        "completedAt": "2026-11-12T15:21:49.589Z",
+        "durationMs": 100,
+        "inputTokens": 154,
+        "outputTokens": 210,
+        "errorMessage": null,
+        "rawOutput": "def solution(input_data):\n    # Generated by AgentArena Reference Mock Agent\n    # Task: Reverse Words in String\n    return input_data[::-1] if isinstance(input_data, str) else input_data\n",
+        "metadata": {
+          "model": "AgentArena-Mock-v1",
+          "evaluatedTask": "task-reverse-words"
+        },
+        "files": {
+          "solution.py": "def solution(input_data):\n    # Generated by AgentArena Reference Mock Agent\n    # Task: Reverse Words in String\n    return input_data[::-1] if isinstance(input_data, str) else input_data\n"
+        }
+      }
+    ],
+    "createdAt": "2026-11-12T15:21:49.482Z"
+  },
+  {
+    "id": "run-1794496792504-0748dc",
+    "title": "Reliability Test: Healthy vs Crashing Agent",
+    "taskId": "task-3e1d4897-db3a-456f-8a37-a28a6074c294",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-f18cf69e-959a-41a2-8876-7ac91af7f4a8",
+      "agent-e39066a3-cd05-4513-a6e4-4a12c9b349e0"
+    ],
+    "status": "PARTIALLY_FAILED",
+    "startedAt": "2026-11-12T15:19:52.504Z",
+    "completedAt": "2026-11-12T15:19:52.514Z",
+    "durationMs": 10,
+    "executions": [
+      {
+        "id": "exec-1794496792504-f6905897",
+        "runId": "run-1794496792504-0748dc",
+        "agentId": "agent-f18cf69e-959a-41a2-8876-7ac91af7f4a8",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:62134/agent-a",
+        "requestId": "req-run-1794496792504-0748dc-agent-f18cf69e-959a-41a2-8876-7ac91af7f4a8",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:19:52.504Z",
+        "completedAt": "2026-11-12T15:19:52.513Z",
+        "durationMs": 7,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794496792504-dbabbaba",
+        "runId": "run-1794496792504-0748dc",
+        "agentId": "agent-e39066a3-cd05-4513-a6e4-4a12c9b349e0",
+        "agentName": "Stage4 Failing Agent",
+        "agentEndpoint": "http://127.0.0.1:62134/agent-fail",
+        "requestId": "req-run-1794496792504-0748dc-agent-e39066a3-cd05-4513-a6e4-4a12c9b349e0",
+        "status": "FAILED",
+        "startedAt": "2026-11-12T15:19:52.505Z",
+        "completedAt": "2026-11-12T15:19:52.514Z",
+        "durationMs": 9,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": "Agent returned HTTP error 500: {\"error\":\"Crash inside agent pipeline\"}",
+        "rawOutput": null,
+        "metadata": {}
+      }
+    ],
+    "createdAt": "2026-11-12T15:19:52.504Z"
+  },
+  {
+    "id": "run-1794496792436-7204e4",
+    "title": "Two Sum Head-to-Head Battle",
+    "taskId": "task-3e1d4897-db3a-456f-8a37-a28a6074c294",
+    "taskTitle": "Two Sum Evaluation Challenge",
+    "taskLanguage": "python",
+    "taskDescription": "Find two numbers that add up to target",
+    "taskDifficulty": "EASY",
+    "agentIds": [
+      "agent-f18cf69e-959a-41a2-8876-7ac91af7f4a8",
+      "agent-2616d708-2cb9-4957-a82c-b9b259d51325"
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-12T15:19:52.436Z",
+    "completedAt": "2026-11-12T15:19:52.501Z",
+    "durationMs": 65,
+    "executions": [
+      {
+        "id": "exec-1794496792437-d9679e73",
+        "runId": "run-1794496792436-7204e4",
+        "agentId": "agent-f18cf69e-959a-41a2-8876-7ac91af7f4a8",
+        "agentName": "Stage4 Test Agent Alpha",
+        "agentEndpoint": "http://127.0.0.1:62134/agent-a",
+        "requestId": "req-run-1794496792436-7204e4-agent-f18cf69e-959a-41a2-8876-7ac91af7f4a8",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:19:52.437Z",
+        "completedAt": "2026-11-12T15:19:52.499Z",
+        "durationMs": 52,
+        "inputTokens": 50,
+        "outputTokens": 25,
+        "errorMessage": null,
+        "rawOutput": "def isPalindrome(s): return True",
+        "metadata": {
+          "agent": "Agent Alpha"
+        }
+      },
+      {
+        "id": "exec-1794496792437-c4e3a723",
+        "runId": "run-1794496792436-7204e4",
+        "agentId": "agent-2616d708-2cb9-4957-a82c-b9b259d51325",
+        "agentName": "Stage4 Test Agent Beta",
+        "agentEndpoint": "http://127.0.0.1:62134/agent-b",
+        "requestId": "req-run-1794496792436-7204e4-agent-2616d708-2cb9-4957-a82c-b9b259d51325",
+        "status": "COMPLETED",
+        "startedAt": "2026-11-12T15:19:52.443Z",
+        "completedAt": "2026-11-12T15:19:52.501Z",
+        "durationMs": 57,
+        "inputTokens": null,
+        "outputTokens": null,
+        "errorMessage": null,
+        "rawOutput": "def solve(): return \"Solution from Beta\"",
+        "metadata": {
+          "agent": "Agent Beta"
+        }
+      }
+    ],
+    "createdAt": "2026-11-12T15:19:52.436Z"
+  }
+]

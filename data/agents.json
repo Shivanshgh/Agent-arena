@@ -1,0 +1,134 @@
+[
+  {
+    "id": "agent-a3c7931a-0a85-4015-af7f-8e0f9491863d",
+    "name": "AgentArena Benchmark Agent Beta",
+    "description": "Secondary reference agent for arena battles",
+    "version": "1.0.0",
+    "integrationType": "HTTP",
+    "endpoint": "http://localhost:3000/api/mock-agent",
+    "supportedLanguages": [
+      "python",
+      "typescript"
+    ],
+    "supportedCapabilities": [
+      "code_generation"
+    ],
+    "authType": "BEARER",
+    "encryptedAuthSecret": "659677dd7aaad3ba2af8339c21b100102f1cd8e3b04f68",
+    "authSecretIv": "c69283d5fcf017fd758735c7",
+    "authSecretTag": "344250eb34f9980b3099637351a19473",
+    "connectionStatus": "UNTESTED",
+    "lastSuccessfulConnection": null,
+    "lastCheckedAt": null,
+    "lastErrorMessage": null,
+    "metadata": {},
+    "createdAt": "2026-11-12T15:21:45.660Z",
+    "updatedAt": "2026-11-12T15:21:45.660Z"
+  },
+  {
+    "id": "agent-mock-builtin",
+    "name": "AgentArena Reference Mock Agent",
+    "description": "Standard built-in reference mock agent for validating protocol v1.0, health checks, and task execution.",
+    "version": "1.0.0",
+    "integrationType": "HTTP",
+    "endpoint": "http://localhost:3000/api/mock-agent",
+    "supportedLanguages": [
+      "typescript",
+      "javascript",
+      "python",
+      "rust",
+      "go"
+    ],
+    "supportedCapabilities": [
+      "code_generation",
+      "code_refactoring",
+      "test_generation",
+      "debugging"
+    ],
+    "authType": "BEARER",
+    "authHeaderName": "Authorization",
+    "encryptedAuthSecret": "31429c2460abc6aa6c2240dd99e56764be17cd0b59e3b8",
+    "authSecretIv": "b2a3e93dbce1485e961bdf21",
+    "authSecretTag": "7c121172ccd7c8257c603e5057d146a2",
+    "connectionStatus": "CONNECTED",
+    "lastSuccessfulConnection": "2026-11-12T15:16:22.037Z",
+    "lastCheckedAt": "2026-11-12T15:16:22.037Z",
+    "lastErrorMessage": null,
+    "metadata": {
+      "author": "AgentArena Team",
+      "benchmarkTier": "Reference"
+    },
+    "createdAt": "2026-11-12T15:06:24.606Z",
+    "updatedAt": "2026-11-12T15:16:22.037Z"
+  },
+  {
+    "id": "agent-claude-coder",
+    "name": "Anthropic Claude Code Adapter",
+    "description": "Production agent wrapper executing complex multi-file coding and refactoring workflows.",
+    "version": "2.1.0",
+    "integrationType": "HTTP",
+    "endpoint": "https://claude-agent-adapter.arena.internal.net",
+    "supportedLanguages": [
+      "python",
+      "typescript",
+      "go",
+      "java",
+      "c++"
+    ],
+    "supportedCapabilities": [
+      "code_generation",
+      "multi_file_editing",
+      "test_generation",
+      "debugging"
+    ],
+    "authType": "BEARER",
+    "authHeaderName": "Authorization",
+    "encryptedAuthSecret": "16ac3a62019ee55cd3dff8c45d47bde9d92b5587e06da0eb908946",
+    "authSecretIv": "f51264c5a26690f845fe4dbf",
+    "authSecretTag": "c2e34766cac224fe69233b11e8cff436",
+    "connectionStatus": "UNTESTED",
+    "lastSuccessfulConnection": null,
+    "lastCheckedAt": null,
+    "lastErrorMessage": null,
+    "metadata": {
+      "framework": "Anthropic Agent SDK",
+      "model": "claude-3-7-sonnet"
+    },
+    "createdAt": "2026-11-11T15:06:24.606Z",
+    "updatedAt": "2026-11-11T15:06:24.606Z"
+  },
+  {
+    "id": "agent-deepseek-r1",
+    "name": "DeepSeek R1 Reasoning Agent",
+    "description": "Autonomous algorithmic reasoning agent optimized for complex competitive programming and bug finding.",
+    "version": "1.2.0",
+    "integrationType": "HTTP",
+    "endpoint": "https://deepseek-coder.arena.internal.net",
+    "supportedLanguages": [
+      "python",
+      "c++",
+      "rust",
+      "typescript"
+    ],
+    "supportedCapabilities": [
+      "code_generation",
+      "debugging",
+      "algorithmic_solving"
+    ],
+    "authType": "API_KEY",
+    "authHeaderName": "X-DeepSeek-Key",
+    "encryptedAuthSecret": "51f4ba1b7803cfab9fb3078a0a2222e2a1f2b65975994a80",
+    "authSecretIv": "f5e612386310aa90909f99c0",
+    "authSecretTag": "5998efdabf090d5b9338787434b5ff75",
+    "connectionStatus": "UNTESTED",
+    "lastSuccessfulConnection": null,
+    "lastCheckedAt": null,
+    "lastErrorMessage": null,
+    "metadata": {
+      "framework": "FastAPI / vLLM",
+      "model": "deepseek-r1"
+    },
+    "createdAt": "2026-11-10T15:06:24.607Z",
+    "updatedAt": "2026-11-10T15:06:24.607Z"
+  }
+]
