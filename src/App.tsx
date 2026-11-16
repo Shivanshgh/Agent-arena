@@ -495,24 +495,21 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans selection:bg-cyan-500/20 selection:text-cyan-300">
       {/* Header */}
       <header className="border-b border-neutral-800 bg-neutral-900/60 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex min-w-0 items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-indigo-600 to-amber-500 flex items-center justify-center shadow-lg shadow-cyan-500/10 border border-neutral-700">
               <Swords className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-bold tracking-tight text-lg text-white">AgentArena</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-                  Stage 8 Ready (Stages 1–8 Complete)
-                </span>
               </div>
-              <p className="text-xs text-neutral-400">AI Coding Agent Benchmark, Deterministic Evaluation Engine & Multi-Provider Arena</p>
+              <p className="text-xs text-neutral-400">AI Coding Agent Benchmark & Evaluation</p>
             </div>
           </div>
 
           {/* Navigation */}
-          <nav className="flex items-center space-x-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1 overflow-x-auto">
+          <nav aria-label="Main navigation" className="flex w-full md:w-auto max-w-full min-w-0 items-center space-x-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1 overflow-x-auto">
             <button
               onClick={() => { setActiveTab('leaderboard'); setViewingRun(null); }}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
@@ -590,7 +587,7 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
           </nav>
 
           {/* Quick Actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex w-full md:w-auto flex-wrap items-center gap-2">
             <span className="hidden xl:inline text-xs text-neutral-400">{user.email}</span>
             <button onClick={onLogout} className="rounded-lg border border-neutral-700 px-3 py-2 text-xs text-neutral-300 hover:text-white">Sign out</button>
             <button
@@ -613,7 +610,7 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 min-w-0 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Metric Badges */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <div className="bg-neutral-900/70 border border-neutral-800 rounded-xl p-4">
