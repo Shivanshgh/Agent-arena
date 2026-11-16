@@ -2,15 +2,25 @@ import { agentDb } from './db';
 import { benchmarkDb } from './benchmark-db';
 import { evaluationDb } from './evaluation-db';
 import { LeaderboardEntry, AnalyticsOverview, BenchmarkReport } from '../types/analytics';
+import { Agent } from '../types/agent';
+import { BenchmarkRun, BenchmarkTask } from '../types/benchmark';
+import { ExecutionEvaluation } from '../types/evaluation';
+
+export interface AnalyticsSnapshot {
+  agents: Agent[];
+  runs: BenchmarkRun[];
+  tasks: BenchmarkTask[];
+  evaluations: ExecutionEvaluation[];
+}
 
 export const analyticsService = {
   /**
    * Calculates leaderboard entries across all evaluated agent benchmark runs
    */
-  getLeaderboard(filters: { language?: string; category?: string } = {}): LeaderboardEntry[] {
-    const agents = agentDb.list();
-    const runs = benchmarkDb.listRuns();
-    const tasks = benchmarkDb.listTasks();
+  getLeaderboard(filters: { language?: string; category?: string } = {}, snapshot?: AnalyticsSnapshot): LeaderboardEntry[] {
+    const agents = snapshot?.agents || agentDb.list();
+    const runs = snapshot?.runs || benchmarkDb.listRuns();
+    const tasks = snapshot?.tasks || benchmarkDb.listTasks();
 
     // Map tasks by ID for quick lookup
     const taskMap = new Map(tasks.map(t => [t.id, t]));
@@ -63,7 +73,7 @@ export const analyticsService = {
         continue;
       }
 
-      const runEvals = evaluationDb.listForRun(run.id);
+      const runEvals = snapshot ? snapshot.evaluations.filter((e) => e.runId === run.id) : evaluationDb.listForRun(run.id);
       const evalMap = new Map(runEvals.map(e => [e.executionId, e]));
 
       for (const exec of run.executions) {
@@ -165,9 +175,9 @@ export const analyticsService = {
   /**
    * Generates system-wide analytics overview
    */
-  getAnalytics(): AnalyticsOverview {
-    const runs = benchmarkDb.listRuns();
-    const tasks = benchmarkDb.listTasks();
+  getAnalytics(snapshot?: AnalyticsSnapshot): AnalyticsOverview {
+    const runs = snapshot?.runs || benchmarkDb.listRuns();
+    const tasks = snapshot?.tasks || benchmarkDb.listTasks();
     const taskMap = new Map(tasks.map(t => [t.id, t]));
 
     let totalExecutions = 0;
@@ -189,7 +199,7 @@ export const analyticsService = {
       if (!categoryStats[category]) categoryStats[category] = { count: 0, totalScore: 0 };
       if (!languageStats[language]) languageStats[language] = { count: 0, totalScore: 0 };
 
-      const runEvals = evaluationDb.listForRun(run.id);
+      const runEvals = snapshot ? snapshot.evaluations.filter((e) => e.runId === run.id) : evaluationDb.listForRun(run.id);
       const evalMap = new Map(runEvals.map(e => [e.executionId, e]));
 
       for (const exec of run.executions) {
@@ -256,12 +266,12 @@ export const analyticsService = {
   /**
    * Compiles structured report for a benchmark run
    */
-  generateRunReport(runId: string): BenchmarkReport | null {
-    const run = benchmarkDb.getRun(runId);
+  generateRunReport(runId: string, snapshot?: AnalyticsSnapshot): BenchmarkReport | null {
+    const run = snapshot?.runs.find((r) => r.id === runId) || (snapshot ? null : benchmarkDb.getRun(runId));
     if (!run) return null;
 
-    const task = benchmarkDb.getTask(run.taskId);
-    const evals = evaluationDb.listForRun(run.id);
+    const task = snapshot?.tasks.find((t) => t.id === run.taskId) || (snapshot ? null : benchmarkDb.getTask(run.taskId));
+    const evals = snapshot ? snapshot.evaluations.filter((e) => e.runId === run.id) : evaluationDb.listForRun(run.id);
     const evalMap = new Map(evals.map(e => [e.executionId, e]));
 
     const agentResults = run.executions.map(exec => {

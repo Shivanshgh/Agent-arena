@@ -54,7 +54,7 @@ const COMMON_CAPABILITIES = [
   { id: 'multi_file_editing', label: 'Multi-file Editing' },
 ];
 
-export default function App() {
+export default function App({ user, onLogout }: { user: { email: string; role: 'USER' | 'ADMIN' }; onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<'registry' | 'tasks' | 'runs' | 'leaderboard' | 'analytics' | 'infrastructure' | 'docs'>('leaderboard');
   const [agents, setAgents] = useState<Agent[]>([]);
   const [tasks, setTasks] = useState<BenchmarkTask[]>([]);
@@ -558,6 +558,8 @@ export default function App() {
 
           {/* Quick Actions */}
           <div className="flex items-center space-x-2">
+            <span className="hidden xl:inline text-xs text-neutral-400">{user.email}</span>
+            <button onClick={onLogout} className="rounded-lg border border-neutral-700 px-3 py-2 text-xs text-neutral-300 hover:text-white">Sign out</button>
             <button
               onClick={() => openNewRunWizard()}
               className="inline-flex items-center space-x-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-semibold text-xs px-3.5 py-2 rounded-lg shadow-sm shadow-amber-500/20 transition active:scale-95 cursor-pointer"

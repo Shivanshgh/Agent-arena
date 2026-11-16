@@ -3,6 +3,8 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { apiRouter } from './src/server/routes';
+import { connectRuntimeDb, runtimeDb, shutdownRuntimeDb } from './src/server/runtime-db';
+import { createAuthMiddleware } from './src/server/auth';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +20,8 @@ async function startServer() {
     if (!process.env.AGENTARENA_SECRET_KEY || !/^[0-9a-fA-F]{64}$/.test(process.env.AGENTARENA_SECRET_KEY)) throw new Error('AGENTARENA_SECRET_KEY must be configured as 64 hexadecimal characters in production.');
     if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required in production; JSON persistence is not production-safe.');
   }
+  if (process.env.NODE_ENV !== 'test' && !process.env.DATABASE_URL) throw new Error('DATABASE_URL is required for authenticated application use.');
+  await connectRuntimeDb();
 
   // Request body parsing with strict size limits
   app.use(express.json({ limit: '2mb' }));
@@ -75,8 +79,13 @@ async function startServer() {
 
   // Liveness endpoint (does not imply database/queue readiness).
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'agentarena' }));
+  app.get('/api/ready', async (_req, res) => {
+    const database = await runtimeDb.databaseReady();
+    res.status(database ? 200 : 503).json({ status: database ? 'ready' : 'not_ready', database: database ? 'connected' : 'unavailable' });
+  });
 
   // Mount API endpoints
+  app.use('/api', createAuthMiddleware(allowedOrigins));
   app.use('/api', apiRouter);
 
   app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -122,6 +131,7 @@ async function startServer() {
       try {
         const { queueService } = await import('./src/server/infrastructure/queue');
         await queueService.shutdown();
+        await shutdownRuntimeDb();
         console.log('[AgentArena] Queue and server connections closed cleanly.');
       } catch (err: any) {
         console.error('[AgentArena] Error during queue shutdown:', err.message);

@@ -31,7 +31,7 @@ AgentArena is an benchmark platform for registering, orchestrating, benchmarking
 ## Architectural Stages
 
 - **Stage 1**: Frontend dashboard, metric badges, responsive layout, task explorer.
-- **Stage 2**: Prisma schema is present; current runtime repositories still use local JSON files. PostgreSQL persistence is NOT IMPLEMENTED.
+- **Stage 2**: Prisma/PostgreSQL runtime repositories are used by the application; JSON repositories are retained for automated tests and legacy import.
 - **Stage 3**: Agent registration, AES-256-GCM authenticated encryption, SSRF protection against private ranges & cloud metadata, standardized HTTP communication protocol v1.0.
 - **Stage 4**: Benchmark task definition, multi-agent battle orchestration, fault isolation.
 - **Stage 5**: Deterministic evaluation engine with weighted scoring:
@@ -41,8 +41,10 @@ AgentArena is an benchmark platform for registering, orchestrating, benchmarking
   - Execution Speed: **10%**
   - Cost Efficiency: **10%** (Re-normalized dynamically when tokens unmeasured)
 - **Stage 6**: Global leaderboard with tie-breaking, language/category filters, analytics aggregations, run history, and CSV/JSON report exports.
-- **Stage 7**: Docker executor contains isolation controls but requires a real daemon validation; Redis/BullMQ queue infrastructure is present but benchmark orchestration is not yet connected to the worker; Bifrost requires live credentials and contract testing.
+- **Stage 7**: BullMQ run dispatch is connected to the benchmark worker; Redis processing and Docker isolation still need live service validation. Bifrost requires credentials and contract testing.
 - **Stage 8**: Security hardening and regression tests; production readiness remains conditional on database, queue, and sandbox integration.
+
+> **Current readiness: partial.** PostgreSQL 17.12 was verified locally against `agentarena_test`: all three migrations applied, CRUD/auth/ownership and API-restart persistence passed, and valid legacy records were imported with source backups. Redis/BullMQ, Docker execution, and live Bifrost remain unverified.
 
 ---
 
@@ -110,7 +112,9 @@ npx tsx src/tests/stage8.test.ts   # Stage 8 Full Production & Security Audit
   npx prisma migrate deploy
   npx prisma generate
   ```
-- WARNING: PostgreSQL is not currently the active runtime persistence layer. The application repositories still read/write `data/*.json`; do not treat this deployment as production-ready or remove these files. A safe JSON-to-PostgreSQL migration has not been implemented.
+- The API and worker use the same Prisma/PostgreSQL configuration; startup fails closed without `DATABASE_URL`. For local setup, create an empty PostgreSQL database, set `DATABASE_URL`, then run the two commands above before `npm run dev`.
+- Keep existing `data/*.json` files backed up. Preview the legacy import with `node scripts/import-json-to-postgres.mjs`; it imports only records with valid relationships and reports every skipped record. `node scripts/import-json-to-postgres.mjs --apply` imports eligible records transactionally and preserves JSON backups under `data/pre-postgres-import-*`. Importing is repeatable by record ID; do not apply until the target database and backup plan are confirmed.
+- Registration is open; new accounts receive the `USER` role and may access their own resources plus shared tasks. Promote an existing account deliberately with `node scripts/promote-admin.mjs user@example.com` after registration.
 
 ### 3. Queue Tier (Redis & BullMQ)
 - Set `REDIS_HOST`, `REDIS_PORT`, and optional `REDIS_PASSWORD`.
@@ -132,7 +136,7 @@ npx tsx src/tests/stage8.test.ts   # Stage 8 Full Production & Security Audit
 - Image variables must use immutable `@sha256:` digests; mutable tags are rejected. Configure `AGENTARENA_DOCKER_IMAGE_PYTHON` and `AGENTARENA_DOCKER_IMAGE_NODE`.
 
 ### 5. Bifrost Model Gateway Tier
-- Configure `BIFROST_ENDPOINT` and `BIFROST_API_KEY` for gateway calls. Live Bifrost connectivity and provider contract are NOT TESTED without a configured service.
+- Optional semantic review: deterministic evaluation is the default. AI review requires a separately running Bifrost gateway, gateway access settings (`BIFROST_ENDPOINT` ending in `/v1` and `BIFROST_API_KEY`), and an upstream provider/model configured in Bifrost. Set `BIFROST_EVALUATION_PROVIDER` and provider-qualified `BIFROST_EVALUATION_MODEL` in AgentArena, then request `aiAssisted: true` on the evaluation endpoint to add a validated semantic score and provenance. AI scores do not change deterministic scores; if gateway or provider setup is missing or fails, the request returns an error and saves no partial evaluation batch.
 - Authorization secrets are kept server-side and redacted from all diagnostic endpoints.
 
 ---
@@ -144,13 +148,15 @@ npx tsx src/tests/stage8.test.ts   # Stage 8 Full Production & Security Audit
 | `PORT` | Optional | `3000` | Port for Express web and API server |
 | `NODE_ENV` | Optional | `development` | Set to `production` in live deployments |
 | `AGENTARENA_SECRET_KEY` | Required when encrypting credentials; mandatory in production | None | Exactly 32 random bytes encoded as 64 hexadecimal characters |
-| `DATABASE_URL` | Required by production startup guard | None | PostgreSQL connection string; active repositories still require migration to Prisma |
+| `DATABASE_URL` | Required in production | None | PostgreSQL connection string; selects Prisma-backed repositories |
 | `REDIS_HOST` | Optional | `127.0.0.1` | Redis host for BullMQ background queue |
 | `REDIS_PORT` | Optional | `6379` | Redis port |
 | `REDIS_PASSWORD` | Optional | Empty | Redis authentication password |
 | `DOCKER_SOCKET` | Optional | `/var/run/docker.sock` | Dedicated worker Docker daemon socket |
-| `BIFROST_ENDPOINT` | Optional | Empty | Unified model gateway API endpoint |
-| `BIFROST_API_KEY` | Optional | Empty | Unified model gateway authorization key |
+| `BIFROST_ENDPOINT` | Optional | Empty | Bifrost gateway base URL ending in `/v1` |
+| `BIFROST_API_KEY` | Optional | Empty | Bifrost bearer key |
+| `BIFROST_EVALUATION_PROVIDER` | Optional | Empty | Provider for opt-in semantic review |
+| `BIFROST_EVALUATION_MODEL` | Optional | Empty | Configured, provider-qualified model, e.g. `openai/gpt-4o-mini` |
 | `ALLOW_LOCAL_TEST_AGENTS` | Optional | `false` in prod | Set to `true` only for dev localhost testing |
 
 ---
@@ -164,19 +170,27 @@ npx tsx src/tests/stage8.test.ts   # Stage 8 Full Production & Security Audit
 - **Sandbox Isolation**: Untrusted code is never executed directly on the application host server.
 
 
-## Production Remediation Status (2026-11-13)
+## Production Remediation Status (2026-11-14)
 
-This source archive is **NOT PRODUCTION READY**. The Prisma schema exists, but the active agent/task/run/evaluation repositories still use JSON files. No Prisma migrations or verified JSON import workflow are included. BullMQ's worker is not yet wired to the benchmark orchestrator. PostgreSQL, Redis, and Docker daemon connectivity must be provisioned and tested separately. Do not delete `data/*.json`; they are the current application data store.
+This source archive is **NOT PRODUCTION READY**. Authentication, session middleware, and server-side resource ownership checks are implemented. PostgreSQL 17.12 was verified on the local `agentarena_test` database; production deployment still requires provisioned Redis/BullMQ and Docker infrastructure, plus Bifrost credentials if that integration is used. JSON files remain preserved as legacy sources and for repeatable import.
 
-The API now requires an explicit `CORS_ORIGINS` allowlist in production, and production startup rejects missing `DATABASE_URL` or an invalid `AGENTARENA_SECRET_KEY`. This is a fail-closed guard, not proof that Prisma persistence is active. Set `AGENTARENA_SECRET_KEY` to 32 random bytes encoded as 64 hex characters. Existing credentials created by the previous SHA-256-derived key format must be migrated first with `npm run crypto:migrate` (set `LEGACY_AGENTARENA_SECRET`, the new `AGENTARENA_SECRET_KEY`, and `CONFIRM_AGENT_SECRET_MIGRATION=true`). The migration makes a timestamped backup and aborts on malformed records; never change the key without this step.
+The API requires an explicit `CORS_ORIGINS` allowlist and production startup checks PostgreSQL connectivity and the `AGENTARENA_SECRET_KEY`. Set the key to 32 random bytes encoded as 64 hex characters. Existing credentials created by the previous SHA-256-derived key format must be migrated first with `npm run crypto:migrate` (set `LEGACY_AGENTARENA_SECRET`, the new `AGENTARENA_SECRET_KEY`, and `CONFIRM_AGENT_SECRET_MIGRATION=true`). The migration makes a timestamped backup and aborts on malformed records; never change the key without this step.
 
 ### Required production configuration
 
 - `NODE_ENV=production`, `PORT`, `CORS_ORIGINS` (comma-separated exact origins)
 - `AGENTARENA_SECRET_KEY` (64 hex characters)
-- `DATABASE_URL` (required by startup guard; runtime repository migration remains outstanding)
+- `DATABASE_URL` (required by startup guard; Prisma migrations must be applied)
 - `REDIS_URL` or `REDIS_HOST`, `REDIS_PORT`, and optional `REDIS_PASSWORD`
 - `BIFROST_ENDPOINT` and `BIFROST_API_KEY` only when using Bifrost
 - A separate hardened Docker worker with a dedicated daemon for code execution
 
-The production `build` command creates the Vite frontend bundle and bundled Node backend; `start` runs the compiled backend. `npm test` runs the Stage 3–8 suites sequentially. Tests requiring live external infrastructure must be reported separately from fixture/unit tests.
+The production `build` command creates the Vite frontend bundle and bundled Node backend; `start` runs the compiled backend. `npm test` runs the Stage 3–9 suites sequentially. `npm run test:postgres` runs database-backed API integration checks and only accepts the local `agentarena_test` target. `/api/health` is a liveness check; `/api/ready` checks PostgreSQL; `/api/infrastructure/status` reports Redis, Docker, and Bifrost status.
+
+## Known Limitations
+
+- Authentication and owner scoping passed database-backed API tests with two users; production multi-instance rate limiting still requires shared Redis.
+- PostgreSQL passed against local PostgreSQL 17.12. Redis/BullMQ and Docker remain unverified against live services; Bifrost request validation is tested but live connectivity is unverified.
+- Import applied to `agentarena_test`: 4 agents, 4 tasks, 1 run, 2 executions, 2 evaluations. It skipped 21 runs and 42 executions with missing parents/duplicate execution IDs; original JSON files and timestamped backups remain. Reapplying inserted zero duplicates.
+- The restricted test environment denies loopback HTTP with `EACCES`; Stage 3–4 fixture suites pass when local networking is permitted.
+- No hosted application, public repository, or walkthrough video has been published.

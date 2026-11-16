@@ -38,3 +38,33 @@ Audit date: 2026-11-13. Source of truth: supplied `Final(1).zip`.
 6. Replace the in-memory rate limiter with shared Redis-backed limiting before multi-instance deployment.
 
 No production deployment, live database connection, live queue, live Docker workload, or live Bifrost call was performed during this remediation.
+
+## Follow-up verification (2026-11-14)
+
+- Fixed the missing Prisma relation opposite field and generated a valid PostgreSQL baseline migration at `prisma/migrations/20261114000000_initial/migration.sql`.
+- Added `scripts/import-json-to-postgres.mjs`. Its default mode is a read-only dry-run; `--apply` uses one transaction, skips duplicate IDs, and copies JSON files into a timestamped backup directory before import.
+- Import dry-run inspected 76 records: 4 agents, 4 tasks, 22 runs, 44 executions, and 2 evaluations. It found 4 agents, 4 tasks, 1 fully valid run, 2 executions, and 2 evaluations. It skips 21 runs and 42 executions as whole-run groups: 16 runs have missing task parents; 5 more runs refer to missing agent `agent-fixture-b` and reuse execution IDs `exec-s6-1`/`exec-s6-2`. No parents or outputs are fabricated; original JSON files were not changed.
+- Removed unused nested source ZIP snapshots from `public/assets/aistudio/`; no application references to that directory were found.
+- Checks using the existing `node_modules`: TypeScript PASS; Prisma validate/generate PASS; Vite frontend and esbuild backend build PASS. Dependency installation was NOT VERIFIED (`npm` is unavailable; `pnpm` cannot create its required workspace symlink under this environment).
+- Automated suites: A restricted run denied loopback `fetch` with `EACCES`; fixtures already bind to a dynamic port on `127.0.0.1`, wait for listen, and close cleanly. The full suite passed Stages 3–8 when rerun with loopback networking permitted. PostgreSQL, Redis, Docker execution, and Bifrost remain NOT VERIFIED.
+- Added `src/server/runtime-db.ts` and routed the API, orchestration worker, analytics, and connection logs through Prisma when `DATABASE_URL` is configured. Production API and worker fail closed without a database URL; startup now connects to PostgreSQL. Tests and local development without a configured database retain the JSON adapter.
+- Live PostgreSQL remains NOT VERIFIED. Reconcile the 21 skipped runs and 42 executions before importing. Authentication/authorization was added in the final phase below; public deployment remains blocked pending live infrastructure and end-to-end verification.
+
+## Final remediation phase (2026-11-14)
+
+- Added account registration/login/logout, scrypt password hashing, hashed opaque sessions, secure HttpOnly/SameSite cookies, auth rate limiting and mutation-origin validation. Added server-side owner scoping for agents, runs, private tasks, executions, evaluations, and analytics; shared/imported tasks remain readable.
+- Added sign-in/register UI and account sign-out. Added Stage 9 authentication/ownership unit checks.
+- Added migration `20261114120000_auth_and_ownership`; Prisma schema validation/client generation, TypeScript, and production build pass.
+- Full suite with loopback networking permitted: Stages 3–9 pass, including Stage 3 16/16 and Stage 4 8/8. A restricted run failed only because its runtime blocked local fixture requests (`EACCES`).
+- Importer dry-run: 76 inspected; agents 4/4 valid, tasks 4/4 valid, runs 1/22 valid, executions 2/44 valid, evaluations 2/2 valid; reconciled 0. Invalid run trees are skipped without altering source JSON.
+- PostgreSQL URL, `psql`, and Docker were unavailable. No migration or import was applied; PostgreSQL persistence, cross-user database isolation, import counts, and restart persistence are NOT VERIFIED. Redis/BullMQ, Docker daemon execution, and Bifrost remain NOT VERIFIED. No public deployment, GitHub publication, or demo recording was made.
+
+## PostgreSQL live verification update (2026-11-14; supersedes prior PostgreSQL status)
+
+- Connected to PostgreSQL **17.12** at `127.0.0.1:5432`, database `agentarena_test`, schema `public`. `.env` is Git-ignored; its password is not recorded here.
+- Applied all three migrations, including evaluation run/task foreign keys after confirming existing imported evaluation references were valid. `prisma migrate status` reports the schema is up to date.
+- Added `scripts/test-postgres-integration.mjs` and `npm run test:postgres`. All 7 integration groups passed: readiness/migration, auth/password/session/logout, agent/task CRUD and connection test, run/execution/evaluation/leaderboard, cross-user access controls, and session/run/evaluation persistence after restarting the API. Test records were cleaned up; final DB counts contain no test users/sessions.
+- Imported 4 agents, 4 tasks, 1 run, 2 executions, and 2 evaluations transactionally. A second apply inserted 0 duplicates. Two timestamped pre-import backups exist; all source JSON files remain intact. Skipped 21 runs and 42 executions for unresolved parent/duplicate-ID relationships; reconciled 0.
+- A live API check found parallel execution updates could leave a completed run marked `RUNNING`; added a transactional final status refresh and verified the completed status against PostgreSQL.
+- Final offline verification: Prisma validation/generation, TypeScript, and production build PASS. Stages 3–8: 63 passed, 0 failed; Stage 9 auth/ownership suite PASS.
+- Still NOT VERIFIED: Redis/BullMQ live processing, Docker workload execution, Bifrost live calls, production deployment, GitHub publication, and demo recording.

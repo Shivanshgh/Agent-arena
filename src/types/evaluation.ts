@@ -38,6 +38,15 @@ export interface EvaluationBreakdown {
     speed: number;
     costEfficiency: number;
   };
+  semanticReview?: {
+    provider: string;
+    model: string;
+    score: number;
+    rationale: string;
+    evidence: string[];
+    evaluatedAt: string;
+    scoringNote: string;
+  };
 }
 
 export interface ExecutionEvaluation {
@@ -64,6 +73,7 @@ export interface ExecutionEvaluation {
 
 export const EvaluateRunSchema = z.object({
   recalculate: z.boolean().default(false),
+  aiAssisted: z.boolean().default(false),
   weights: z
     .object({
       accuracy: z.number().min(0).max(1),

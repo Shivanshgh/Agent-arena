@@ -1,6 +1,6 @@
 import assert from 'assert';
 import { DockerExecutor } from '../server/infrastructure/docker-executor';
-import { queueService } from '../server/infrastructure/queue';
+import { queueService, redisRetryDelay } from '../server/infrastructure/queue';
 import { BifrostGateway } from '../server/infrastructure/bifrost';
 
 async function runStage7Tests() {
@@ -53,6 +53,15 @@ async function runStage7Tests() {
   // ---------------------------------------------------------
   // 2. Redis & BullMQ Job Queue
   // ---------------------------------------------------------
+  await test('Redis / BullMQ: Retries with bounded backoff and keeps recovery enabled outside tests', async () => {
+    assert.strictEqual(redisRetryDelay(5), 2500);
+    assert.strictEqual(redisRetryDelay(6), null);
+    const oldEnvironment = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try { assert.strictEqual(redisRetryDelay(100), 2500); }
+    finally { process.env.NODE_ENV = oldEnvironment; }
+  });
+
   await test('Redis / BullMQ: Handles offline Redis safely without throwing unhandled exceptions', async () => {
     const queueStatus = await queueService.getStatus();
 
@@ -96,6 +105,12 @@ async function runStage7Tests() {
 
     assert.strictEqual(res.success, false);
     assert(res.errorMessage?.includes('Bifrost Gateway is not configured') || res.errorMessage?.includes('error'));
+  });
+
+  await test('Bifrost: Rejects malformed model requests before network access', async () => {
+    const result = await BifrostGateway.queryModel({ provider: 'openai', model: '', prompt: 'test' });
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.errorMessage, 'Invalid Bifrost request.');
   });
 
   console.log('\n------------------------------------------------------');

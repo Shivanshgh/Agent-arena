@@ -1,15 +1,16 @@
 import crypto from 'crypto';
-import { agentDb } from './db';
-import { benchmarkDb } from './benchmark-db';
+import { runtimeDb } from './runtime-db';
 import { AgentHttpAdapter } from './http-adapter';
 import { BenchmarkRun, AgentExecution, CreateRunInput } from '../types/benchmark';
 import { StandardizedAgentRequest } from '../types/agent';
+import type { AuthUser } from './auth';
 
 // Set of actively running run IDs to prevent duplicate execution attempts
 const activeRuns = new Set<string>();
 
 export interface OrchestrationOptions {
   waitForCompletion?: boolean;
+  actor?: AuthUser;
 }
 
 export class BenchmarkOrchestrator {
@@ -20,6 +21,9 @@ export class BenchmarkOrchestrator {
     input: CreateRunInput,
     options: OrchestrationOptions = { waitForCompletion: false }
   ): Promise<BenchmarkRun> {
+    if (process.env.NODE_ENV === 'production' && options.waitForCompletion) {
+      throw new Error('Synchronous benchmark execution is disabled in production.');
+    }
     // 1. Validation: At least two agents required
     if (!input.agentIds || input.agentIds.length < 2) {
       throw new Error('At least two eligible agents must be selected for a benchmark run.');
@@ -32,19 +36,19 @@ export class BenchmarkOrchestrator {
     }
 
     // 2. Validate Task
-    const task = benchmarkDb.getTask(input.taskId);
+    const task = await runtimeDb.getTask(input.taskId, options.actor);
     if (!task) {
       throw new Error(`Task with ID ${input.taskId} not found.`);
     }
 
     // 3. Validate Agents exist and are eligible
-    const selectedAgentsWithSecret = uniqueAgentIds.map(agentId => {
-      const record = agentDb.getWithSecret(agentId);
+    const selectedAgentsWithSecret = await Promise.all(uniqueAgentIds.map(async (agentId) => {
+      const record = await runtimeDb.getAgentWithSecret(agentId, options.actor);
       if (!record) {
         throw new Error(`Agent with ID ${agentId} not found.`);
       }
       return record;
-    });
+    }));
 
     const runId = `run-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
     const now = new Date().toISOString();
@@ -87,27 +91,43 @@ export class BenchmarkOrchestrator {
       createdAt: now,
     };
 
-    benchmarkDb.createRun(initialRun);
+    await runtimeDb.createRun(initialRun, options.actor);
 
     // 5. Prefer the durable Redis queue when available; direct execution is a dev fallback.
     if (!options.waitForCompletion) {
       const { queueService } = await import('./infrastructure/queue');
       const queued = await queueService.enqueueRunJob(runId, { runId });
       if (queued.enqueued) return initialRun;
+      if (process.env.NODE_ENV === 'production') {
+        const failedAt = new Date().toISOString();
+        for (const execution of executions) {
+          await runtimeDb.updateExecution(runId, execution.id, {
+            status: 'FAILED', completedAt: failedAt,
+            errorMessage: 'Background queue is unavailable; execution was not started.',
+          });
+        }
+        return (await runtimeDb.getRun(runId, options.actor))!;
+      }
     }
 
     await this.executeRun(runId, task, selectedAgentsWithSecret);
-    return benchmarkDb.getRun(runId)!;
+    return (await runtimeDb.getRun(runId, options.actor))!;
   }
 
   /** Reloads persisted run context for BullMQ worker execution. */
   static async resumeRun(runId: string): Promise<void> {
-    const run = benchmarkDb.getRun(runId);
+    let run = await runtimeDb.getRun(runId);
     if (!run) throw new Error(`Benchmark run ${runId} was not found`);
     if (['COMPLETED', 'FAILED', 'PARTIALLY_FAILED'].includes(run.status)) return;
-    const task = benchmarkDb.getTask(run.taskId);
+    for (const execution of run.executions.filter((item) => item.status === 'RUNNING')) {
+      await runtimeDb.updateExecution(runId, execution.id, {
+        status: 'QUEUED', completedAt: null, errorMessage: 'Execution restarted after worker interruption.',
+      });
+    }
+    run = (await runtimeDb.getRun(runId))!;
+    const task = await runtimeDb.getTask(run.taskId);
     if (!task) throw new Error(`Benchmark task ${run.taskId} was not found`);
-    const agents = run.executions.filter(e => e.status === 'QUEUED').map(e => agentDb.getWithSecret(e.agentId)).filter((v): v is NonNullable<typeof v> => Boolean(v));
+    const agents = (await Promise.all(run.executions.filter(e => e.status === 'QUEUED').map(e => runtimeDb.getAgentWithSecret(e.agentId)))).filter((v): v is NonNullable<typeof v> => Boolean(v));
     if (!agents.length) return;
     await this.executeRun(runId, task, agents);
   }
@@ -117,7 +137,7 @@ export class BenchmarkOrchestrator {
    */
   private static async executeRun(
     runId: string,
-    task: ReturnType<typeof benchmarkDb.getTask> & object,
+    task: NonNullable<Awaited<ReturnType<typeof runtimeDb.getTask>>>,
     agentsWithSecret: Array<{ agent: any; secret?: string }>
   ): Promise<void> {
     if (activeRuns.has(runId)) {
@@ -126,7 +146,7 @@ export class BenchmarkOrchestrator {
     activeRuns.add(runId);
 
     try {
-      const run = benchmarkDb.getRun(runId);
+      const run = await runtimeDb.getRun(runId);
       if (!run) return;
 
       // Dispatch identical task payload to all selected agents
@@ -137,7 +157,7 @@ export class BenchmarkOrchestrator {
         const { agent, secret } = agentRecord;
 
         // Mark execution RUNNING
-        benchmarkDb.updateExecution(runId, execution.id, {
+        await runtimeDb.updateExecution(runId, execution.id, {
           status: 'RUNNING',
           startedAt: new Date().toISOString(),
         });
@@ -185,7 +205,7 @@ export class BenchmarkOrchestrator {
 
           if (execResult.success && execResult.response) {
             const resData = execResult.response;
-            benchmarkDb.updateExecution(runId, execution.id, {
+            await runtimeDb.updateExecution(runId, execution.id, {
               status: 'COMPLETED',
               completedAt: new Date().toISOString(),
               durationMs: measuredDuration,
@@ -202,7 +222,7 @@ export class BenchmarkOrchestrator {
               execResult.response?.status === 'timed_out' ||
               execResult.errorMessage?.toLowerCase().includes('timed out');
 
-            benchmarkDb.updateExecution(runId, execution.id, {
+            await runtimeDb.updateExecution(runId, execution.id, {
               status: isTimeout ? 'TIMED_OUT' : 'FAILED',
               completedAt: new Date().toISOString(),
               durationMs: measuredDuration,
@@ -214,7 +234,7 @@ export class BenchmarkOrchestrator {
             });
           }
         } catch (err: any) {
-          benchmarkDb.updateExecution(runId, execution.id, {
+          await runtimeDb.updateExecution(runId, execution.id, {
             status: 'FAILED',
             completedAt: new Date().toISOString(),
             durationMs: Date.now() - startTime,
@@ -227,7 +247,11 @@ export class BenchmarkOrchestrator {
       });
 
       // Use Promise.allSettled to guarantee that one failing agent never aborts other agents
-      await Promise.allSettled(executionPromises);
+      const outcomes = await Promise.allSettled(executionPromises);
+      if (outcomes.some(outcome => outcome.status === 'rejected')) {
+        throw new Error('One or more benchmark execution records could not be persisted.');
+      }
+      await runtimeDb.refreshRunStatus(runId);
     } finally {
       activeRuns.delete(runId);
     }

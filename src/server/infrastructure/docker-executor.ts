@@ -163,8 +163,8 @@ export class DockerExecutor {
     }
 
     return new Promise((resolve) => {
-      let stdout = Buffer.alloc(0);
-      let stderr = Buffer.alloc(0);
+      let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+      let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
       let outputExceeded = false;
       let timedOut = false;
       const appendBounded = (current: Buffer, chunk: Buffer): Buffer => {

@@ -6,7 +6,6 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const isolatedDataDir = mkdtempSync(resolve(tmpdir(), 'agentarena-tests-'));
 const env = {
   ...process.env,
   NODE_ENV: 'test',
@@ -20,13 +19,12 @@ const suites = [
   'src/tests/stage6.test.ts',
   'src/tests/stage7.test.ts',
   'src/tests/stage8.test.ts',
+  'src/tests/stage9-auth.test.ts',
+  'src/tests/stage10-bifrost.test.ts',
 ];
-try {
-  for (const suite of suites) {
-    const result = spawnSync(process.execPath, [resolve(root, 'node_modules/tsx/dist/cli.mjs'), resolve(root, suite)], { stdio: 'inherit', env, cwd: isolatedDataDir });
-    if (result.status !== 0) process.exitCode = result.status ?? 1;
-    if (process.exitCode) break;
-  }
-} finally {
+for (const suite of suites) {
+  const isolatedDataDir = mkdtempSync(resolve(tmpdir(), 'agentarena-tests-'));
+  const result = spawnSync(process.execPath, [resolve(root, 'node_modules/tsx/dist/cli.mjs'), resolve(root, suite)], { stdio: 'inherit', env, cwd: isolatedDataDir });
   rmSync(isolatedDataDir, { recursive: true, force: true });
+  if (result.status !== 0) process.exitCode = result.status ?? 1;
 }

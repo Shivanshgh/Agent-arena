@@ -14,6 +14,11 @@ let redisConnected = false;
 let redisError: string | null = null;
 let connectionAttempted = false;
 
+export function redisRetryDelay(attempt: number): number | null {
+  if (process.env.NODE_ENV === 'test' && attempt > 5) return null;
+  return Math.min(Math.max(1, attempt) * 500, 2500);
+}
+
 /**
  * Initializes Redis connection safely without crashing on failure
  */
@@ -26,7 +31,8 @@ export function getRedisClient(): Redis | null {
   try {
     const opts: any = {
       maxRetriesPerRequest: 1,
-      retryStrategy: (times: number) => times > 5 ? null : Math.min(times * 500, 2500),
+      // Keep production/development clients reconnecting if Redis restarts; tests cap retries to exit cleanly.
+      retryStrategy: redisRetryDelay,
       lazyConnect: true,
       connectTimeout: 2000,
       enableOfflineQueue: false,
@@ -108,7 +114,20 @@ function initQueue() {
         concurrency: 5,
       }
     );
-    benchmarkWorker?.on('failed', (job, error) => console.error('[BullMQ] Benchmark job failed', { jobId: job?.id, message: error.message }));
+    benchmarkWorker?.on('failed', (job, error) => {
+      console.error('[BullMQ] Benchmark job failed', { jobId: job?.id, error: error.name });
+      if (!job || job.attemptsMade < (job.opts.attempts || 1) || typeof job.data?.runId !== 'string') return;
+      void (async () => {
+        const { runtimeDb } = await import('../runtime-db');
+        const run = await runtimeDb.getRun(job.data.runId);
+        for (const execution of run?.executions.filter(item => ['QUEUED', 'RUNNING'].includes(item.status)) || []) {
+          await runtimeDb.updateExecution(job.data.runId, execution.id, {
+            status: 'FAILED', completedAt: new Date().toISOString(),
+            errorMessage: 'Benchmark worker failed after retry limit.',
+          });
+        }
+      })().catch(failure => console.error('[BullMQ] Failed to persist terminal run state', { error: failure instanceof Error ? failure.name : 'Error' }));
+    });
     benchmarkWorker?.on('error', error => { redisError = error.message; });
   } catch (err: any) {
     console.error('[BullMQ] Initialization error:', err.message);
