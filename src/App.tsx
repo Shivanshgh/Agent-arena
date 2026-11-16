@@ -204,6 +204,39 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
     }
   };
 
+  const handleRegisterAgent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setIsSavingAgent(true);
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formName.trim(), description: formDesc.trim(), version: formVersion.trim(),
+          endpoint: formEndpoint.trim(), authType: formAuthType,
+          ...(formAuthType !== 'NONE' ? { authSecret: formSecret.trim() } : {}),
+          ...(formAuthType === 'CUSTOM_HEADER' ? { authHeaderName: formHeaderName.trim() } : {}),
+          supportedLanguages: formLanguages,
+          supportedCapabilities: formCapabilities,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setFormError(data.error || data.issues?.map((issue: { message: string }) => issue.message).join(', ') || 'Could not register agent.');
+        return;
+      }
+      setIsRegisterOpen(false);
+      setFormName(''); setFormDesc(''); setFormEndpoint(''); setFormSecret('');
+      const refreshed = await fetch('/api/agents').then(r => r.json());
+      if (refreshed.success) setAgents(refreshed.data);
+    } catch {
+      setFormError('Could not reach the server. Please try again.');
+    } finally {
+      setIsSavingAgent(false);
+    }
+  };
+
   const handleEvaluateRun = async (recalculate = false) => {
     if (!viewingRun) return;
     setIsEvaluating(true);
@@ -2098,6 +2131,29 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
                 <span>Launch Benchmark Battle</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AGENT REGISTRATION MODAL */}
+      {isRegisterOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <h2 className="text-base font-bold text-white">Register Agent</h2>
+            <form onSubmit={handleRegisterAgent} className="space-y-3">
+              {formError && <div role="alert" className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-xs text-rose-300">{formError}</div>}
+              <label className="block text-xs text-neutral-300">Agent name *<input required minLength={2} maxLength={64} value={formName} onChange={e => setFormName(e.target.value)} className="mt-1 w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200" /></label>
+              <label className="block text-xs text-neutral-300">Agent endpoint URL *<input required type="url" placeholder="https://your-agent.example.com" value={formEndpoint} onChange={e => setFormEndpoint(e.target.value)} className="mt-1 w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200" /></label>
+              <label className="block text-xs text-neutral-300">Description<textarea maxLength={500} value={formDesc} onChange={e => setFormDesc(e.target.value)} className="mt-1 w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200" /></label>
+              <label className="block text-xs text-neutral-300">Supported language *<select value={formLanguages[0] || 'python'} onChange={e => setFormLanguages([e.target.value])} className="mt-1 w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200">{COMMON_LANGUAGES.map(language => <option key={language} value={language}>{language}</option>)}</select></label>
+              <label className="block text-xs text-neutral-300">Authentication<select value={formAuthType} onChange={e => setFormAuthType(e.target.value as typeof formAuthType)} className="mt-1 w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200"><option value="NONE">None</option><option value="BEARER">Bearer token</option><option value="API_KEY">API key</option><option value="CUSTOM_HEADER">Custom header</option></select></label>
+              {formAuthType === 'CUSTOM_HEADER' && <label className="block text-xs text-neutral-300">Header name<input required value={formHeaderName} onChange={e => setFormHeaderName(e.target.value)} className="mt-1 w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200" /></label>}
+              {formAuthType !== 'NONE' && <label className="block text-xs text-neutral-300">Secret<input required type="password" value={formSecret} onChange={e => setFormSecret(e.target.value)} className="mt-1 w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200" /></label>}
+              <div className="pt-3 border-t border-neutral-800 flex justify-end space-x-2">
+                <button type="button" onClick={() => setIsRegisterOpen(false)} className="px-4 py-2 text-xs text-neutral-400 hover:text-white">Cancel</button>
+                <button type="submit" disabled={isSavingAgent} className="px-4 py-2 rounded-lg text-xs font-medium bg-cyan-600 hover:bg-cyan-500 text-white disabled:opacity-50">{isSavingAgent ? 'Registering…' : 'Register Agent'}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
