@@ -1,0 +1,7 @@
+{
+  "name": "agentarena-gemini-agent",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.9.0" },
+  "scripts": { "start": "node --env-file-if-exists=.env server.mjs" }
+}
