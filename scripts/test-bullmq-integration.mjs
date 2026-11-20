@@ -10,11 +10,18 @@ import { PrismaClient } from '@prisma/client';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dbUrl = new URL(process.env.DATABASE_URL || '');
-const redisUrl = new URL(process.env.REDIS_URL || '');
+const isolatedRedisUrl = process.env.AGENTARENA_TEST_REDIS_URL;
+if (!isolatedRedisUrl) throw new Error('Set AGENTARENA_TEST_REDIS_URL to a dedicated test Redis; refusing to use REDIS_URL.');
+const redisUrl = new URL(isolatedRedisUrl);
 assert.equal(dbUrl.hostname, '127.0.0.1');
 assert.equal(dbUrl.port, '5432');
 assert.equal(decodeURIComponent(dbUrl.pathname.slice(1)), 'agentarena_test');
-assert.equal(redisUrl.protocol, 'rediss:');
+assert.ok(redisUrl.protocol === 'rediss:' || (redisUrl.protocol === 'redis:' && ['127.0.0.1', 'localhost', '::1'].includes(redisUrl.hostname)), 'Test Redis must use TLS remotely or be local.');
+if (process.env.REDIS_URL) {
+  const configuredRedisUrl = new URL(process.env.REDIS_URL);
+  assert.notEqual(redisUrl.host, configuredRedisUrl.host, 'Test Redis must be a separate instance from REDIS_URL.');
+}
+process.env.REDIS_URL = redisUrl.toString();
 const prisma = new PrismaClient();
 const uid = randomUUID();
 const marker = `BullMQ verification ${uid}`;
@@ -69,8 +76,9 @@ async function cleanup() {
 }
 
 try {
-  assert.ok(redisUrl.hostname && redisUrl.password, 'REDIS_URL must include Upstash credentials');
-  console.log('PASS ignored .env REDIS_URL loaded; rediss TLS configured');
+  const localRedisHost = ['127.0.0.1', 'localhost', '::1'].includes(redisUrl.hostname);
+  assert.ok(redisUrl.hostname && (redisUrl.password || localRedisHost), 'Remote test Redis must include credentials; local Redis may be unauthenticated.');
+  console.log('PASS dedicated test Redis selected; non-TLS Redis allowed only on loopback');
   fixture = createServer(async (req, res) => {
     const send = (status, data) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); };
     if (req.url === '/health') return send(200, { status: 'healthy', version: '1.0.0' });

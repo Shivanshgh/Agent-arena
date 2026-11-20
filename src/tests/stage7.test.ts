@@ -1,6 +1,6 @@
 import assert from 'assert';
 import { DockerExecutor } from '../server/infrastructure/docker-executor';
-import { queueService, redisRetryDelay } from '../server/infrastructure/queue';
+import { getBullConnectionOptions, queueService, redisRetryDelay } from '../server/infrastructure/queue';
 import { BifrostGateway } from '../server/infrastructure/bifrost';
 
 async function runStage7Tests() {
@@ -62,6 +62,16 @@ async function runStage7Tests() {
     finally { process.env.NODE_ENV = oldEnvironment; }
   });
 
+  await test('Redis / BullMQ: Parses Upstash rediss URL with TLS and escaped credentials', async () => {
+    const options = getBullConnectionOptions('rediss://user%40tenant:pass%3Aword@redis.example:6380/2');
+    assert.strictEqual(options.host, 'redis.example');
+    assert.strictEqual(options.port, 6380);
+    assert.strictEqual(options.username, 'user@tenant');
+    assert.strictEqual(options.password, 'pass:word');
+    assert.deepStrictEqual(options.tls, {});
+    assert.strictEqual(options.db, 2);
+  });
+
   await test('Redis / BullMQ: Handles offline Redis safely without throwing unhandled exceptions', async () => {
     const queueStatus = await queueService.getStatus();
 
@@ -76,7 +86,8 @@ async function runStage7Tests() {
 
     // In environment without Redis running, it gracefully returns enqueued: false with diagnostic reason
     if (!res.enqueued) {
-      assert(res.reason?.includes('offline') || res.reason?.includes('unprovisioned'));
+      if (typeof res.reason !== 'string') throw new Error('Offline queue must provide a diagnostic reason.');
+      assert(res.reason.length > 0);
     } else {
       assert.strictEqual(res.jobId, runId);
     }

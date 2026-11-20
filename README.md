@@ -1,6 +1,6 @@
 # AgentArena — AI Coding Agent Benchmark & Evaluation Arena
 
-AgentArena is an benchmark platform for registering, orchestrating, benchmarking, evaluating, and ranking autonomous AI coding agents under standardized communication protocols, isolated execution environments, and deterministic scoring models.
+AgentArena is a platform for registering, orchestrating, benchmarking, evaluating, and ranking autonomous AI coding agents over a standardized HTTP protocol. Its current deterministic evaluator scores returned source text; it does not run that code against executable test cases.
 
 ---
 
@@ -34,7 +34,7 @@ AgentArena is an benchmark platform for registering, orchestrating, benchmarking
 - **Stage 2**: Prisma/PostgreSQL runtime repositories are used by the application; JSON repositories are retained for automated tests and legacy import.
 - **Stage 3**: Agent registration, AES-256-GCM authenticated encryption, SSRF protection against private ranges & cloud metadata, standardized HTTP communication protocol v1.0.
 - **Stage 4**: Benchmark task definition, multi-agent battle orchestration, fault isolation.
-- **Stage 5**: Deterministic evaluation engine with weighted scoring:
+- **Stage 5**: Deterministic heuristic evaluation of returned source text (not code execution) with weighted scoring:
   - Accuracy: **40%**
   - Task Completion: **25%**
   - Reliability: **15%**
@@ -117,8 +117,10 @@ npx tsx src/tests/stage8.test.ts   # Stage 8 Full Production & Security Audit
 - Registration is open; new accounts receive the `USER` role and may access their own resources plus shared tasks. Promote an existing account deliberately with `node scripts/promote-admin.mjs user@example.com` after registration.
 
 ### 3. Queue Tier (Redis & BullMQ)
-- Set `REDIS_HOST`, `REDIS_PORT`, and optional `REDIS_PASSWORD`.
-- The API enqueues jobs; run `npm run worker` as a separate process to consume them. Configure `REDIS_URL` or `REDIS_HOST`/`REDIS_PORT`; live worker execution is NOT TESTED.
+- Production must set `REDIS_URL` to a reachable Redis service; Upstash URLs should use `rediss://`. Configure the same `REDIS_URL` on the API and worker.
+- The API enqueues jobs; run `npm run worker` as a separate process to consume them, or set `AGENTARENA_WORKER_ENABLED=true` on the API service to have it also process jobs. Do one or the other; the worker flag does not configure Redis.
+- For a Render worker service, use the same repository/branch, build command `npm ci && npm run build`, and start command `npm run worker`. Set `NODE_ENV=production`, `DATABASE_URL`, `REDIS_URL`, and `AGENTARENA_SECRET_KEY` to the same values used by the Web Service.
+- `npm run test:bullmq` requires the local `agentarena_test` PostgreSQL database plus `AGENTARENA_TEST_REDIS_URL` pointing at a separate test Redis instance. It refuses to reuse the main `REDIS_URL` host.
 - BullMQ enforces idempotency: `jobId = runId`, preventing duplicate execution runs.
 
 ### 4. Sandbox Execution Tier (Docker)
@@ -182,15 +184,18 @@ The API requires an explicit `CORS_ORIGINS` allowlist and production startup che
 - `AGENTARENA_SECRET_KEY` (64 hex characters)
 - `DATABASE_URL` (required by startup guard; Prisma migrations must be applied)
 - `REDIS_URL` or `REDIS_HOST`, `REDIS_PORT`, and optional `REDIS_PASSWORD`
+- Run `npm run worker` as a separate background process, or set `AGENTARENA_WORKER_ENABLED=true` in the API service to let that process also consume BullMQ jobs.
 - `BIFROST_ENDPOINT` and `BIFROST_API_KEY` only when using Bifrost
-- A separate hardened Docker worker with a dedicated daemon for code execution
+- Docker is not required for the current HTTP-agent path; the Docker executor is not wired into benchmark orchestration.
 
-The production `build` command creates the Vite frontend bundle and bundled Node backend; `start` runs the compiled backend. `npm test` runs the Stage 3–9 suites sequentially. `npm run test:postgres` runs database-backed API integration checks and only accepts the local `agentarena_test` target. `/api/health` is a liveness check; `/api/ready` checks PostgreSQL; `/api/infrastructure/status` reports Redis, Docker, and Bifrost status.
+The production `build` command creates the Vite frontend bundle and bundled Node backend; `start` runs the compiled backend. `npm test` runs the Stage 3–10 suites sequentially. `npm run test:postgres` runs database-backed API integration checks and only accepts the local `agentarena_test` target. `npm run test:bullmq` requires `AGENTARENA_TEST_REDIS_URL` for an isolated Redis instance and refuses the main `REDIS_URL`. `/api/health` is a liveness check; `/api/ready` checks PostgreSQL; `/api/infrastructure/status` reports Redis, Docker, and Bifrost configuration.
 
 ## Known Limitations
 
 - Authentication and owner scoping passed database-backed API tests with two users; production multi-instance rate limiting still requires shared Redis.
-- PostgreSQL passed against local PostgreSQL 17.12. Redis/BullMQ and Docker remain unverified against live services; Bifrost request validation is tested but live connectivity is unverified.
+- Deterministic scores currently use code-length, language-pattern, title-keyword, and expected-output substring checks; generated code is not executed, so accuracy scores are not functional correctness measurements.
+- The HTTP benchmark orchestrator does not use `DockerExecutor`; Docker status is an infrastructure probe, not evidence of sandboxed benchmark execution.
+- PostgreSQL passed against local PostgreSQL 17.12. This audit has not yet verified BullMQ against an isolated Redis test instance; `npm run test:bullmq` requires `AGENTARENA_TEST_REDIS_URL`. Live Bifrost connectivity is unverified.
 - Import applied to `agentarena_test`: 4 agents, 4 tasks, 1 run, 2 executions, 2 evaluations. It skipped 21 runs and 42 executions with missing parents/duplicate execution IDs; original JSON files and timestamped backups remain. Reapplying inserted zero duplicates.
 - The restricted test environment denies loopback HTTP with `EACCES`; Stage 3–4 fixture suites pass when local networking is permitted.
 - No hosted application, public repository, or walkthrough video has been published.

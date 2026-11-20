@@ -43,6 +43,9 @@ async function listen(server) {
 function startApi(port) {
   const env = {
     ...process.env, NODE_ENV: 'development', PORT: String(port),
+    // Keep this non-queue integration suite away from any developer or production Redis.
+    REDIS_URL: 'redis://127.0.0.1:1', REDIS_HOST: '127.0.0.1', REDIS_PORT: '1',
+    AGENTARENA_WORKER_ENABLED: 'false',
     CORS_ORIGINS: origin.current, ALLOW_LOCAL_TEST_AGENTS: 'true', ENABLE_DEMO_SEED: 'false',
     BIFROST_ENDPOINT: bifrostUrl, BIFROST_API_KEY: 'integration-test-only',
     BIFROST_EVALUATION_PROVIDER: 'openai', BIFROST_EVALUATION_MODEL: 'openai/integration-test-model',

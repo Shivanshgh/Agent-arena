@@ -1,0 +1,126 @@
+
+> react-example@0.0.0 test
+> node scripts/test.mjs
+
+
+======================================================
+  AgentArena — STAGE 3 Comprehensive Verification Suite
+======================================================
+
+• Testing: SSRF: Detects and blocks private IPv4 ranges (RFC 1918 & 3927) ... ✓ PASS
+• Testing: SSRF: Blocks cloud metadata hostnames and localhost ... ✓ PASS
+• Testing: SSRF: Rejects non-HTTP/HTTPS protocols (ftp, file, gopher) ... ✓ PASS
+• Testing: Crypto: AES-256-GCM correctly encrypts and decrypts secrets ... ✓ PASS
+• Testing: Security: Credential redaction masks tokens properly ... ✓ PASS
+• Testing: Registry: Registers new agent with encrypted credentials ... ✓ PASS
+• Testing: Registry: Retrieves agent by ID and ensures secret is hidden ... ✓ PASS
+• Testing: Registry: Updates agent metadata without leaking credentials ... ✓ PASS
+• Testing: Registry: Deletes registered agent cleanly ... ✓ PASS
+• Testing: Fixture Server: Initializes local mock agent fixture ... ✓ PASS
+• Testing: HTTP Adapter: Successful health check against fixture ... ✓ PASS
+• Testing: HTTP Adapter: Injects Bearer token authorization correctly ... ✓ PASS
+• Testing: HTTP Adapter: Handles agent 500 error gracefully ... ✓ PASS
+• Testing: HTTP Adapter: Rejects malformed JSON from agent ... ✓ PASS
+• Testing: HTTP Adapter: Executes standardized task and validates protocol v1.0 response ... ✓ PASS
+• Testing: HTTP Adapter: Enforces request timeout on unresponsive agents ... ✓ PASS
+
+------------------------------------------------------
+Results: 16 Passed, 0 Failed
+------------------------------------------------------
+
+
+======================================================
+  AgentArena — STAGE 4 Benchmark Orchestration Suite
+======================================================
+
+• Testing: Task CRUD: Creates benchmark task with proper validation defaults ... ✓ PASS
+• Testing: Task CRUD: Reads and lists benchmark tasks ... ✓ PASS
+• Testing: Task CRUD: Updates task properties cleanly ... ✓ PASS
+• Testing: Task CRUD: Deletes benchmark task ... ✓ PASS
+• Testing: Fixture: Spin up multi-agent test server for execution testing ... ✓ PASS
+• Testing: Orchestrator: Rejects run with fewer than 2 agents ... ✓ PASS
+• Testing: Orchestrator: Dispatches identical task payload to multiple agents and collects results ... ✓ PASS
+• Testing: Orchestrator: Handles partial failure without failing other agents (Run marked PARTIALLY_FAILED) ... ✓ PASS
+
+------------------------------------------------------
+Results: 8 Passed, 0 Failed
+------------------------------------------------------
+
+
+======================================================
+  AgentArena — STAGE 5 Evaluation Engine Verification
+======================================================
+
+• Testing: Weights: Configured default weights sum to exactly 1.0 (100%) ... ✓ PASS
+• Testing: Weights: Rejects custom weights that do not sum to 1.0 ... ✓ PASS
+• Testing: Accuracy & Tests: Evaluates completed execution against test cases ... ✓ PASS
+• Testing: Missing Metrics: Cost efficiency is null when tokens unmeasured; re-normalizes without penalty ... ✓ PASS
+• Testing: Failure Handling: Failed execution receives strictly 0 overall score ... ✓ PASS
+• Testing: Timeout Handling: Timed out execution receives strictly 0 overall score and 0 accuracy ... ✓ PASS
+• Testing: Persistence: Saves and retrieves evaluations from disk ... ✓ PASS
+
+------------------------------------------------------
+Results: 7 Passed, 0 Failed
+------------------------------------------------------
+
+
+======================================================
+  AgentArena — STAGE 6 Leaderboard & Analytics Suite
+======================================================
+
+• Testing: Leaderboard: Computes correct ranks and orders agents by overall score ... ✓ PASS
+• Testing: Leaderboard: Filters rankings by programming language correctly ... ✓ PASS
+• Testing: Leaderboard: Distinguishes unmeasured tokens (null) without penalizing success rate ... ✓ PASS
+• Testing: Analytics: Aggregates system metrics, category, and language breakdowns ... ✓ PASS
+• Testing: Reports: Generates complete structured JSON report for a benchmark run ... ✓ PASS
+• Testing: Reports: Exports clean, parseable CSV report with correct column headers ... ✓ PASS
+
+------------------------------------------------------
+Results: 6 Passed, 0 Failed
+------------------------------------------------------
+
+
+======================================================
+  AgentArena — STAGE 7 Advanced Infrastructure Suite
+======================================================
+
+• Testing: Docker: Security profile strictly enforces non-root, read-only, and network-disabled flags ... ✓ PASS
+• Testing: Docker: Gracefully detects Docker daemon absence and reports BLOCKED_BY_EXTERNAL_INFRASTRUCTURE ... ✓ PASS
+• Testing: Redis / BullMQ: Retries with bounded backoff and keeps recovery enabled outside tests ... ✓ PASS
+• Testing: Redis / BullMQ: Handles offline Redis safely without throwing unhandled exceptions ... ✓ PASS
+• Testing: Queue Idempotency: Provides idempotency contract using runId as unique jobId ... ✓ PASS
+• Testing: Bifrost: Inspects provider status and redacts secret keys in status reports ... ✓ PASS
+• Testing: Bifrost: Gracefully handles unconfigured gateway without throwing fatal exceptions ... ✓ PASS
+• Testing: Bifrost: Rejects malformed model requests before network access ... ✓ PASS
+
+------------------------------------------------------
+Results: 8 Passed, 0 Failed
+------------------------------------------------------
+
+======================================================
+  AgentArena — STAGE 8 Final Security, Optimization &
+             Comprehensive Regression Suite           
+======================================================
+• Testing: Security: SSRF correctly flags all RFC 1918 & 3927 private IPv4 ranges ... [32m✓ PASS[0m
+• Testing: Security: SSRF flags loopback, link-local, unique-local & IPv4-mapped IPv6 ... [32m✓ PASS[0m
+• Testing: Security: SSRF strictly blocks GCP/cloud metadata hostnames ... [32m✓ PASS[0m
+• Testing: Security: SSRF strictly blocks raw cloud metadata IP 169.254.169.254 ... [32m✓ PASS[0m
+• Testing: Security: AES-256-GCM authenticated cipher roundtrip succeeds ... [32m✓ PASS[0m
+• Testing: Security: AES-256-GCM rejects tampered ciphertext or auth tag ... [32m✓ PASS[0m
+• Testing: Security: Credential redaction masks sensitive tokens cleanly ... [32m✓ PASS[0m
+• Testing: Stage 5 Engine: Default weights sum to exactly 1.0 (100%) ... [32m✓ PASS[0m
+• Testing: Stage 5 Engine: Unmeasured tokens yield null cost score without penalizing agent ... [32m✓ PASS[0m
+• Testing: Stage 5 Engine: FAILED execution deterministically receives 0 overall score ... [32m✓ PASS[0m
+• Testing: Stage 6 Leaderboard: Generates array of ranked agent entries ... [32m✓ PASS[0m
+• Testing: Stage 6 Leaderboard: Single/Empty leaderboard valid ... [32m✓ PASS[0m
+• Testing: Stage 6 Analytics: Aggregates KPIs with correct data types ... [32m✓ PASS[0m
+• Testing: Stage 6 Reports: Fallback check verified ... [32m✓ PASS[0m
+• Testing: Stage 7 Docker: Enforces non-root, network-disabled, read-only rootfs and 512m memory limit ... [32m✓ PASS[0m
+• Testing: Stage 7 Docker: Accurately reports daemon status without false claims ... [32m✓ PASS[0m
+• Testing: Stage 7 Redis: Safe connection handling without unhandled exceptions ... [32m✓ PASS[0m
+• Testing: Stage 7 Bifrost: Unified gateway declares supported model providers and redacts credentials ... [32m✓ PASS[0m
+------------------------------------------------------
+Results: 18 Passed, 0 Failed
+------------------------------------------------------
+Stage 9 authentication and ownership tests: PASS
+Bifrost semantic review tests: PASS (missing credentials/config, success, invalid response, provider error, timeout).
