@@ -203,3 +203,7 @@ Run the read-only query documented in `audit-report/REMAINING_WORK.md` against `
 3. On the user's Windows laptop, rerun the guarded PostgreSQL verification script only after reviewing its confirmation prompts; preserve all existing audit fixtures.
 4. Run `npm run test:bullmq` only with a separate disposable `AGENTARENA_TEST_REDIS_URL`.
 5. Verify Render web/worker environment and real queue processing from the owner's dashboard. Do not describe local tests as live deployment verification.
+
+### README readiness correction — 2026-11-21
+- Reconciled architecture/stage claims, quickstart, Node requirement, Render commands, Prisma migration scripts, environment variables, security controls, and limitations with current code and actual verification. Marked PostgreSQL, isolated BullMQ, providers, and Render as unverified where appropriate; preserved the user's reported database records as uninspected.
+- `git diff --check`: PASS after documentation updates. No tests rerun because this correction changed documentation only; previous full suite, lint, Prisma validation, and build remain current for code.

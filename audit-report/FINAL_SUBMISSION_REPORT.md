@@ -8,6 +8,7 @@
 - Replaced the scrolling header navigation with a left drawer containing all nine existing destinations, count/status badges and active-state styling. Drawer supports Escape, backdrop click, selection close, dialog labeling, keyboard focus trapping and focus return.
 - Kept branding, Launch Battle and New Task. Account email and sign-out are in a compact responsive disclosure.
 - README documents Render Web Service build `npm ci && npm run build`, start `npm start`, and separate Worker start `npm run worker`; Express serves the frontend, so no separate Static Site is required. Configure `NODE_ENV=production`, `DATABASE_URL`, `REDIS_URL`, `AGENTARENA_SECRET_KEY`, and exact-origin `CORS_ORIGINS` on both services. Apply `npm run prisma:migrate:deploy` manually against the intended database before release. No Render blueprint exists.
+- README architecture, security claims, quickstart, Node prerequisite, environment-variable list, migration commands, and known limitations were reconciled with the code and current evidence. Removed outdated claims that all API routes share a limiter, that PostgreSQL CRUD was fully verified, and that Docker is required for the HTTP workflow.
 - `.gitignore` already excludes `.env*` and retains `.env.example`; it was not changed.
 
 ## Verification
