@@ -21,6 +21,8 @@ const suites = [
   'src/tests/stage8.test.ts',
   'src/tests/stage9-auth.test.ts',
   'src/tests/stage10-bifrost.test.ts',
+  'src/tests/model-providers.test.ts',
+  'src/tests/model-orchestration.test.ts',
 ];
 for (const suite of suites) {
   const isolatedDataDir = mkdtempSync(resolve(tmpdir(), 'agentarena-tests-'));

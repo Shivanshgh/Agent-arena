@@ -64,6 +64,7 @@ async function runStage5Tests() {
     difficulty: 'EASY',
     inputData: { nums: [2, 7, 11, 15], target: 9 },
     expectedOutput: '[0, 1]',
+    evaluationStrategy: 'HEURISTIC_TEXT',
     timeoutSeconds: 30,
     maxOutputSizeBytes: 100000,
     isActive: true,
@@ -95,15 +96,32 @@ async function runStage5Tests() {
     const evaluation = engine.evaluateExecution(sampleTask, sampleCompletedExecution);
 
     assert(evaluation.id.startsWith('eval-'));
-    assert.strictEqual(evaluation.evaluationStatus, 'EVALUATED');
-    assert.strictEqual(evaluation.evaluationVersion, '1.0.0');
-    assert(evaluation.accuracyScore > 75, `Accuracy should be high, got ${evaluation.accuracyScore}`);
+    assert.strictEqual(evaluation.evaluationStatus, 'HEURISTIC');
+    assert.strictEqual(evaluation.evaluationVersion, '1.1.0');
+    assert((evaluation.accuracyScore ?? 0) > 75, `Heuristic diagnostic should be high, got ${evaluation.accuracyScore}`);
     assert(evaluation.passedTestCount >= 3, 'At least 3 test cases should pass');
     assert.strictEqual(evaluation.completionScore, 100);
     assert.strictEqual(evaluation.reliabilityScore, 100);
     assert(evaluation.speedScore >= 90, 'Fast execution should receive high speed score');
     assert(evaluation.costEfficiencyScore !== null && evaluation.costEfficiencyScore > 80);
-    assert(evaluation.overallScore >= 85, `Overall score should be high, got ${evaluation.overallScore}`);
+    assert((evaluation.overallScore ?? 0) >= 85, `Heuristic diagnostic should be high, got ${evaluation.overallScore}`);
+  });
+
+  await test('Code correctness: stays unverified without an isolated code test runner', async () => {
+    const evaluation = engine.evaluateExecution({ ...sampleTask, evaluationStrategy: 'CODE_UNVERIFIED' }, sampleCompletedExecution);
+    assert.equal(evaluation.accuracyScore, null);
+    assert.equal(evaluation.overallScore, null);
+    assert.equal(evaluation.evaluationStatus, 'UNVERIFIED');
+    assert.equal(evaluation.totalTestCount, 0);
+  });
+
+  await test('Task-specific exact and JSON evaluation rejects wrong or malformed answers', async () => {
+    const exact = engine.evaluateExecution({ ...sampleTask, evaluationStrategy: 'EXACT_MATCH', expectedOutput: '42' }, { ...sampleCompletedExecution, rawOutput: '42' });
+    const wrong = engine.evaluateExecution({ ...sampleTask, evaluationStrategy: 'EXACT_MATCH', expectedOutput: '42' }, { ...sampleCompletedExecution, rawOutput: 'forty two' });
+    const json = engine.evaluateExecution({ ...sampleTask, evaluationStrategy: 'JSON_EXACT', expectedOutput: '{"a":1,"b":2}' }, { ...sampleCompletedExecution, rawOutput: '{"b":2,"a":1}' });
+    const malformed = engine.evaluateExecution({ ...sampleTask, evaluationStrategy: 'JSON_EXACT', expectedOutput: '{"a":1}' }, { ...sampleCompletedExecution, rawOutput: 'not-json' });
+    assert.equal(exact.accuracyScore, 100); assert.equal(exact.evaluationStatus, 'EVALUATED');
+    assert.equal(wrong.accuracyScore, 0); assert.equal(json.accuracyScore, 100); assert.equal(malformed.accuracyScore, 0);
   });
 
   await test('Missing Metrics: Cost efficiency is null when tokens unmeasured; re-normalizes without penalty', async () => {
@@ -117,7 +135,7 @@ async function runStage5Tests() {
     const evaluation = engine.evaluateExecution(sampleTask, execWithoutTokens);
 
     assert.strictEqual(evaluation.costEfficiencyScore, null);
-    assert(evaluation.overallScore > 80, 'Score must not drop to zero due to missing token measurement');
+    assert((evaluation.overallScore ?? 0) > 80, 'Score must not drop to zero due to missing token measurement');
     assert.strictEqual(evaluation.breakdown.reNormalizedWeights.costEfficiency, 0);
     assert(evaluation.breakdown.reNormalizedWeights.accuracy > 0.40, 'Remaining weights must dynamically scale');
   });

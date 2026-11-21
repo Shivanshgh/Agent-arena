@@ -37,3 +37,36 @@
 - PostgreSQL: local dedicated `agentarena_test` only.
 - Redis: create a separate disposable instance; set `AGENTARENA_TEST_REDIS_URL` in the local test process. Do not reuse the main `REDIS_URL`.
 - Commands: `npm test`, `npm run test:postgres`, `npm run test:bullmq`, `npm run prisma:validate`, `npm run prisma:generate`, `npm run lint`, `npm run build`.
+
+## Remaining work update (2026-11-20)
+
+1. Start local PostgreSQL 17 and confirm the isolated `agentarena_test` database is reachable; rerun `npm run test:postgres` to exercise the prepared three-agent API workflow, evaluation persistence, leaderboard, ownership and restart checks.
+2. Provision a disposable dedicated Redis, set `AGENTARENA_TEST_REDIS_URL` only in the local process, and run `npm run test:bullmq` for enqueue/process/retry/recovery. Never reuse hosted app Redis.
+3. For Render verification, deploy the queue fix and run a real benchmark while checking redacted API/worker logs and PostgreSQL persistence. Render credentials/logs are not present here.
+4. Replace correctness claims from text heuristics with actual test-case execution in a secure isolated sandbox before calling the scores reliable. No arbitrary code was run on this host.
+5. Rerun `npm test` with local HTTP fixture access enabled; this environment denied loopback Stage 3 calls in the latest run.
+
+## Dual-mode work remaining (2026-11-20)
+
+1. Start isolated PostgreSQL and rerun `npm run test:postgres`; it now includes model credential ownership/encryption, model results, leaderboard, and restart persistence. Do not use production.
+2. Configure disposable Redis only as `AGENTARENA_TEST_REDIS_URL`, then run `npm run test:bullmq` to verify enqueue, processing, retries, and recovery. Never reuse hosted app `REDIS_URL`.
+3. For opt-in provider checks, configure credentials locally and test live calls; never paste secrets into chat or reports.
+4. Review/apply the migration and verify web/worker queue behavior in Render; Render access was unavailable for this audit.
+5. Add an isolated sandbox and task test harness before treating coding scores as proof of correctness.
+
+## Exact blockers after verification continuation
+
+- PostgreSQL service at `127.0.0.1:5432` is unreachable; Windows service inspection was denied. Start the local PostgreSQL service with administrator rights if required, then confirm the isolated `agentarena_test` database before applying migrations and rerunning integration.
+- `AGENTARENA_TEST_REDIS_URL` is unset. Provide a disposable Redis endpoint (local loopback or dedicated TLS Redis) before queue lifecycle tests; never set it to the production app Redis.
+- The isolated queue test harness covers retry, duplicate job ID, worker restart recovery, API restart, and PostgreSQL persistence. Run these after both local PostgreSQL and the disposable Redis are available.
+- Live providers, Render behavior, and sandboxed code correctness remain NOT VERIFIED.
+
+## Recheck 2026-11-21
+
+The services are still unavailable from this workspace: local test PostgreSQL connect returns P1001 and no dedicated Redis URL is configured. Once available here, run `npm run prisma:migrate:deploy`, `npm run test:postgres`, and `npm run test:bullmq`; these are not complete yet. Do not substitute app `REDIS_URL`.
+
+## Local Windows database verification handoff
+
+Run `.\scripts\verify-postgres-windows.ps1` from `C:\agentarena`. If it reports only `20261120120000_model_benchmarking` pending and you approve the printed schema impact, rerun with `-ApplyPendingMigrations` and type its explicit confirmation. It never resets the database; tests separately prompt before creating and cleaning uniquely owned test records. Share migration status and final PASS/FAIL lines only, not `.env`.
+
+Latest user run reports schema up to date. Before another integration run, inspect likely test-created ownerless agents read-only. Their removal needs separate approval; do not delete automatically. The evaluation assertion and owner-scoped cleanup have been fixed in code; database verification still requires a rerun after safe artifact review.

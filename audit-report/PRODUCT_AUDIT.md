@@ -39,3 +39,13 @@ AgentArena substantially implements the *shape* of the chosen problem: developer
 - Documented the worker option and clarified that scoring is heuristic and Docker is not wired into the HTTP benchmark path.
 
 Detailed status and evidence are in [FEATURE_MATRIX.md](FEATURE_MATRIX.md), [TEST_RESULTS.md](TEST_RESULTS.md), [BUG_REPORT.md](BUG_REPORT.md), and [PRODUCT_READINESS.md](PRODUCT_READINESS.md).
+
+## Dual-mode implementation update (2026-11-20)
+
+The application now includes optional model benchmarking for Gemini, OpenAI, Anthropic, and DeepSeek alongside HTTP agents. Both use benchmark tasks and the BullMQ run queue. Provider credentials are encrypted and owner-scoped; model output and evaluation provenance are persisted separately. Code tasks default to `CODE_UNVERIFIED`; exact text and canonical JSON comparisons are opt-in. Heuristic scores are labeled and excluded from scored leaderboards. Optional Bifrost semantic review is stored separately.
+
+Automated suites pass with local HTTP fixture access (Stages 3–8: 66 checks; auth/ownership, Bifrost, provider contract/error handling, and model orchestration also pass). Prisma validation/generation, TypeScript, and build pass. PostgreSQL integration is BLOCKED because local PostgreSQL is unreachable. Dedicated Redis/BullMQ, live provider calls, and Render deployment are NOT VERIFIED. No candidate code is executed or proven correct.
+
+Verification continuation: static migration review found no destructive SQL and leaves HTTP-agent schema/data paths unchanged; database-level preservation remains NOT VERIFIED because local `agentarena_test` is offline. PostgreSQL migration/CRUD/E2E checks and real BullMQ lifecycle checks are BLOCKED by unavailable PostgreSQL and missing dedicated test Redis. The full offline suite and all four provider mock suites pass, including unsupported-model, rate-limit, auth, timeout, and malformed-response behavior.
+
+Environment recheck (2026-11-21): PostgreSQL preflight and integration still fail before application tests; test Redis is not configured and the safety guard stopped queue tests. Offline full regression, Prisma validate/generate, lint, and build pass. No live database, Redis, provider, or Render result is claimed.

@@ -93,7 +93,7 @@ try {
   const fixturePort = await listen(fixture);
   const net = createNetServer(); const port = await listen(net); await new Promise(r => net.close(r));
   apiUrl = `http://127.0.0.1:${port}`;
-  const env = { ...process.env, NODE_ENV: 'development', PORT: String(port), CORS_ORIGINS: apiUrl, ALLOW_LOCAL_TEST_AGENTS: 'true', ENABLE_DEMO_SEED: 'false' };
+  const env = { ...process.env, NODE_ENV: 'development', PORT: String(port), CORS_ORIGINS: apiUrl, ALLOW_LOCAL_TEST_AGENTS: 'true', ENABLE_DEMO_SEED: 'false', AGENTARENA_WORKER_ENABLED: 'false' };
   worker = child('worker.ts', env);
   api = child('server.ts', env);
   let ready = false;
@@ -148,6 +148,10 @@ try {
     password: decodeURIComponent(redisUrl.password) || undefined,
     db: Number(redisUrl.pathname.slice(1)) || 0, tls: {}, maxRetriesPerRequest: null,
   } });
+  const duplicateJob = await retryQueue.add('execute-benchmark-run', { runId }, { jobId: runId });
+  assert.equal(duplicateJob.id, runId);
+  assert.equal(await (await retryQueue.getJob(runId)).getState(), 'completed');
+  console.log('PASS duplicate submission for a completed run reuses the existing BullMQ job');
   const retryJob = await retryQueue.add('test-failure-retry', { runId: `missing-${uid}` }, {
     jobId: `retrycheck-${uid}`, attempts: 2, backoff: { type: 'exponential', delay: 100 },
   });
@@ -158,6 +162,20 @@ try {
   await finalRetryJob.remove();
   await retryQueue.close();
   console.log('PASS BullMQ worker retries a failed job twice and records terminal failure');
+
+  await stop(worker); worker = null;
+  const queuedWhileStopped = await request('/api/runs', { method: 'POST', cookie, body: { title: `${marker} after worker restart`, taskId, agentIds } });
+  assert.equal(queuedWhileStopped.data.status, 'QUEUED');
+  worker = child('worker.ts', env);
+  let recoveredRun;
+  for (let i = 0; i < 90; i++) {
+    recoveredRun = (await request(`/api/runs/${queuedWhileStopped.data.id}`, { cookie })).data;
+    if (['COMPLETED', 'FAILED', 'PARTIALLY_FAILED'].includes(recoveredRun.status)) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  assert.equal(recoveredRun?.status, 'COMPLETED', 'restarted worker should consume the waiting run');
+  assert.ok(recoveredRun.executions.every(execution => execution.status === 'COMPLETED'));
+  console.log('PASS queued run is processed after BullMQ worker restart');
 
   await stop(api, apiUrl + '/api/health'); api = child('server.ts', env);
   let restarted = false;

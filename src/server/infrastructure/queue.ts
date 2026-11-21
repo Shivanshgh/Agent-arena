@@ -185,6 +185,12 @@ function initQueue() {
             errorMessage: 'Benchmark worker failed after retry limit.',
           });
         }
+        for (const execution of run?.modelExecutions?.filter(item => ['QUEUED', 'RUNNING'].includes(item.status)) || []) {
+          await runtimeDb.updateModelExecution(job.data.runId, execution.id, {
+            status: 'FAILED', completedAt: new Date().toISOString(),
+            errorMessage: 'Benchmark worker failed after retry limit.',
+          });
+        }
       })().catch(failure => console.error('[BullMQ] Failed to persist terminal run state', { error: failure instanceof Error ? failure.name : 'Error' }));
     });
     benchmarkWorker?.on('ready', () => { localWorkerReady = true; });

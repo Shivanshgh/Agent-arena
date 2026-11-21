@@ -103,9 +103,9 @@ export const analyticsService = {
         }
 
         const ev = evalMap.get(exec.id);
-        if (ev) {
+        if (ev?.overallScore !== null && ev?.evaluationStatus === 'EVALUATED') {
           stats.overallScores.push(ev.overallScore);
-          stats.accuracyScores.push(ev.accuracyScore);
+          if (ev.accuracyScore !== null) stats.accuracyScores.push(ev.accuracyScore);
           stats.completionScores.push(ev.completionScore);
           stats.reliabilityScores.push(ev.reliabilityScore);
           stats.speedScores.push(ev.speedScore);
@@ -211,7 +211,7 @@ export const analyticsService = {
         }
 
         const ev = evalMap.get(exec.id);
-        if (ev) {
+        if (ev?.overallScore !== null && ev?.evaluationStatus === 'EVALUATED') {
           totalScoreSum += ev.overallScore;
           totalEvalCount++;
 

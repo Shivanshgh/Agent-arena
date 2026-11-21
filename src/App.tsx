@@ -41,11 +41,11 @@ import {
   PieChart
 } from 'lucide-react';
 import { Agent, ConnectionTestResult, StandardizedAgentRequest, StandardizedAgentResponse } from './types/agent';
-import { BenchmarkTask, BenchmarkRun, TaskDifficulty, RunStatus, ExecutionStatus } from './types/benchmark';
+import { BenchmarkTask, BenchmarkRun, TaskDifficulty, EvaluationStrategy, RunStatus, ExecutionStatus } from './types/benchmark';
 import { ExecutionEvaluation } from './types/evaluation';
 import { LeaderboardEntry, AnalyticsOverview, InfrastructureStatus } from './types/analytics';
 
-const COMMON_LANGUAGES = ['typescript', 'javascript', 'python', 'go', 'rust', 'c++', 'java', 'sql'];
+const COMMON_LANGUAGES = ['text', 'typescript', 'javascript', 'python', 'go', 'rust', 'c++', 'java', 'sql'];
 const COMMON_CAPABILITIES = [
   { id: 'code_generation', label: 'Code Generation' },
   { id: 'code_refactoring', label: 'Code Refactoring' },
@@ -55,8 +55,19 @@ const COMMON_CAPABILITIES = [
 ];
 
 export default function App({ user, onLogout }: { user: { email: string; role: 'USER' | 'ADMIN' }; onLogout: () => void }) {
-  const [activeTab, setActiveTab] = useState<'registry' | 'tasks' | 'runs' | 'leaderboard' | 'analytics' | 'infrastructure' | 'docs'>('leaderboard');
+  const [activeTab, setActiveTab] = useState<'registry' | 'tasks' | 'runs' | 'leaderboard' | 'model-leaderboard' | 'models' | 'analytics' | 'infrastructure' | 'docs'>('leaderboard');
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [modelConnections, setModelConnections] = useState<Array<{ id: string; provider: string; modelId: string; displayName: string }>>([]);
+  const [modelConnectionChecks, setModelConnectionChecks] = useState<Record<string, { status: string; error?: string }>>({});
+  const [provider, setProvider] = useState('GEMINI');
+  const [providerKey, setProviderKey] = useState('');
+  const [providerModels, setProviderModels] = useState<Array<{ id: string; displayName: string }>>([]);
+  const [selectedProviderModel, setSelectedProviderModel] = useState('');
+  const [providerError, setProviderError] = useState('');
+  const [providerBusy, setProviderBusy] = useState(false);
+  const [modelLeaderboard, setModelLeaderboard] = useState<any[]>([]);
+  const [modelLeaderboardCategory, setModelLeaderboardCategory] = useState('ALL');
+  const [modelLeaderboardRunId, setModelLeaderboardRunId] = useState('ALL');
   const [tasks, setTasks] = useState<BenchmarkTask[]>([]);
   const [runs, setRuns] = useState<BenchmarkRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,6 +110,7 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
   const [taskFormDifficulty, setTaskFormDifficulty] = useState<TaskDifficulty>('MEDIUM');
   const [taskFormInputJson, setTaskFormInputJson] = useState('{}');
   const [taskFormExpected, setTaskFormExpected] = useState('');
+  const [taskFormStrategy, setTaskFormStrategy] = useState<EvaluationStrategy>('CODE_UNVERIFIED');
   const [taskFormTimeout, setTaskFormTimeout] = useState(60);
   const [taskFormError, setTaskFormError] = useState<string | null>(null);
   const [isSavingTask, setIsSavingTask] = useState(false);
@@ -107,6 +119,8 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
   const [isNewRunModalOpen, setIsNewRunModalOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
   const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
+  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
+  const [runMode, setRunMode] = useState<'agents' | 'models'>('agents');
   const [runTitleInput, setRunTitleInput] = useState('');
   const [isLaunchingRun, setIsLaunchingRun] = useState(false);
   const [runLaunchError, setRunLaunchError] = useState<string | null>(null);
@@ -137,15 +151,17 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [resAgents, resTasks, resRuns] = await Promise.all([
+      const [resAgents, resTasks, resRuns, resModels] = await Promise.all([
         fetch('/api/agents').then(r => r.json()),
         fetch('/api/tasks').then(r => r.json()),
         fetch('/api/runs').then(r => r.json()),
+        fetch('/api/model-connections').then(r => r.json()),
       ]);
 
       if (resAgents.success) setAgents(resAgents.data);
       if (resTasks.success) setTasks(resTasks.data);
       if (resRuns.success) setRuns(resRuns.data);
+      if (resModels.success) setModelConnections(resModels.data);
     } catch (err) {
       console.error('Failed fetching data', err);
     } finally {
@@ -194,11 +210,10 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
 
   const fetchEvaluationsForRun = async (runId: string) => {
     try {
+      if (viewingRun?.id === runId && viewingRun.modelExecutions?.length) { setEvaluations([]); return; }
       const res = await fetch(`/api/runs/${runId}/evaluations`);
       const data = await res.json();
-      if (data.success) {
-        setEvaluations(data.data);
-      }
+      if (data.success) setEvaluations(data.data);
     } catch (err) {
       console.error('Failed fetching evaluations', err);
     }
@@ -237,16 +252,25 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
     }
   };
 
-  const handleEvaluateRun = async (recalculate = false) => {
+  const handleEvaluateRun = async (recalculate = false, aiAssisted = false) => {
     if (!viewingRun) return;
     setIsEvaluating(true);
     try {
       const res = await fetch(`/api/runs/${viewingRun.id}/evaluate?recalculate=${recalculate}`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiAssisted }),
       });
       const data = await res.json();
       if (data.success) {
-        setEvaluations(data.data);
+        if (viewingRun.modelExecutions?.length) {
+          const refreshed = await fetch(`/api/runs/${viewingRun.id}`).then(response => response.json());
+          if (refreshed.success) {
+            setViewingRun(refreshed.data);
+            setRuns(previous => previous.map(run => run.id === refreshed.data.id ? refreshed.data : run));
+            await fetchModelLeaderboard();
+          }
+        } else setEvaluations(data.data);
       }
     } catch (err) {
       console.error('Failed evaluating run', err);
@@ -266,6 +290,52 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
     } catch (err) {
       console.error('Failed fetching leaderboard', err);
     }
+  };
+
+  const testProviderKey = async () => {
+    setProviderError(''); setProviderBusy(true); setProviderModels([]);
+    try {
+      const response = await fetch('/api/model-providers/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, apiKey: providerKey }) });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Provider validation failed.');
+      setProviderModels(result.data.models); setSelectedProviderModel(result.data.models[0]?.id || '');
+    } catch (error) { setProviderError(error instanceof Error ? error.message : 'Provider validation failed.'); }
+    finally { setProviderBusy(false); }
+  };
+
+  const saveModelConnection = async () => {
+    setProviderError(''); setProviderBusy(true);
+    try {
+      const response = await fetch('/api/model-connections', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, apiKey: providerKey, modelId: selectedProviderModel }) });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not save model connection.');
+      setProviderKey(''); setProviderModels([]); setModelConnections(previous => [result.data, ...previous.filter(item => item.id !== result.data.id)]);
+    } catch (error) { setProviderError(error instanceof Error ? error.message : 'Could not save model connection.'); }
+    finally { setProviderBusy(false); }
+  };
+
+  const deleteModelConnection = async (id: string) => {
+    const response = await fetch(`/api/model-connections/${id}`, { method: 'DELETE' });
+    if (response.ok) setModelConnections(previous => previous.filter(item => item.id !== id));
+  };
+
+  const testSavedModelConnection = async (id: string) => {
+    setModelConnectionChecks(previous => ({ ...previous, [id]: { status: 'CHECKING' } }));
+    try {
+      const response = await fetch(`/api/model-connections/${id}/test`, { method: 'POST' });
+      const result = await response.json();
+      setModelConnectionChecks(previous => ({ ...previous, [id]: { status: result.data?.status || 'ERROR', error: result.error } }));
+    } catch { setModelConnectionChecks(previous => ({ ...previous, [id]: { status: 'ERROR', error: 'Provider connection could not be reached.' } })); }
+  };
+
+  const fetchModelLeaderboard = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (modelLeaderboardCategory !== 'ALL') params.set('category', modelLeaderboardCategory);
+      if (modelLeaderboardRunId !== 'ALL') params.set('runId', modelLeaderboardRunId);
+      const response = await fetch(`/api/leaderboard/models?${params.toString()}`); const result = await response.json(); if (result.success) setModelLeaderboard(result.data);
+    }
+    catch { setModelLeaderboard([]); }
   };
 
   const fetchAnalytics = async () => {
@@ -293,9 +363,10 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
 
   useEffect(() => {
     if (activeTab === 'leaderboard') fetchLeaderboard(leaderboardLang, leaderboardCat);
+    if (activeTab === 'model-leaderboard') fetchModelLeaderboard();
     if (activeTab === 'analytics') fetchAnalytics();
     if (activeTab === 'infrastructure') fetchInfrastructure();
-  }, [activeTab, leaderboardLang, leaderboardCat]);
+  }, [activeTab, leaderboardLang, leaderboardCat, modelLeaderboardCategory, modelLeaderboardRunId]);
 
   const handleExportReport = (runId: string, format: 'json' | 'csv') => {
     const a = document.createElement('a');
@@ -317,6 +388,7 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
       setTaskFormDifficulty(task.difficulty);
       setTaskFormInputJson(JSON.stringify(task.inputData || {}, null, 2));
       setTaskFormExpected(task.expectedOutput || '');
+      setTaskFormStrategy(task.evaluationStrategy || 'CODE_UNVERIFIED');
       setTaskFormTimeout(task.timeoutSeconds);
     } else {
       setEditingTask(null);
@@ -327,6 +399,7 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
       setTaskFormDifficulty('MEDIUM');
       setTaskFormInputJson('{\n  "input": "sample"\n}');
       setTaskFormExpected('');
+      setTaskFormStrategy('CODE_UNVERIFIED');
       setTaskFormTimeout(60);
     }
     setTaskFormError(null);
@@ -356,6 +429,7 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
         difficulty: taskFormDifficulty,
         inputData: parsedInput,
         expectedOutput: taskFormExpected.trim() || undefined,
+        evaluationStrategy: taskFormStrategy,
         timeoutSeconds: Number(taskFormTimeout),
       };
 
@@ -414,8 +488,9 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
       setRunLaunchError('Please select a benchmark task.');
       return;
     }
-    if (selectedAgentIds.length < 2) {
-      setRunLaunchError('You must select at least 2 distinct agents for a benchmark battle.');
+    const selectedCount = runMode === 'agents' ? selectedAgentIds.length : selectedModelIds.length;
+    if (selectedCount < 2) {
+      setRunLaunchError(runMode === 'agents' ? 'Select at least two HTTP agents.' : 'Select at least two connected models.');
       return;
     }
 
@@ -427,7 +502,7 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
         body: JSON.stringify({
           title: runTitleInput.trim() || undefined,
           taskId: selectedTaskId,
-          agentIds: selectedAgentIds,
+          ...(runMode === 'agents' ? { agentIds: selectedAgentIds } : { modelConnectionIds: selectedModelIds }),
         }),
       });
 
@@ -529,6 +604,13 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
             >
               <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
               <span>Analytics</span>
+            </button>
+
+            <button onClick={() => { setActiveTab('models'); setViewingRun(null); }} className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${activeTab === 'models' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}>
+              <Cpu className="w-3.5 h-3.5 text-violet-400" /><span>Model Connections</span>
+            </button>
+            <button onClick={() => { setActiveTab('model-leaderboard'); setViewingRun(null); }} className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${activeTab === 'model-leaderboard' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}>
+              <Trophy className="w-3.5 h-3.5 text-violet-400" /><span>Model Leaderboard</span>
             </button>
 
             <button
@@ -649,6 +731,49 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
             <div className="text-[11px] text-neutral-500">Timeout & Partial Failure Isolation</div>
           </div>
         </div>
+
+        {activeTab === 'models' && (
+          <section className="max-w-4xl mx-auto space-y-5">
+            <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-5 space-y-4">
+              <div><h2 className="text-white font-bold">Connect a model provider</h2><p className="text-xs text-neutral-400 mt-1">Keys are sent only to the selected provider for validation, then encrypted in PostgreSQL. They are never returned to this page.</p></div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <select value={provider} onChange={e => { setProvider(e.target.value); setProviderModels([]); }} className="bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-white">
+                  <option value="GEMINI">Google Gemini</option><option value="OPENAI">OpenAI</option><option value="ANTHROPIC">Anthropic Claude</option><option value="DEEPSEEK">DeepSeek</option>
+                </select>
+                <input type="password" autoComplete="new-password" value={providerKey} onChange={e => setProviderKey(e.target.value)} placeholder="Provider API key" className="bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-white" />
+              </div>
+              {providerError && <div role="alert" className="text-xs text-rose-300">{providerError}</div>}
+              <div className="flex flex-wrap gap-2">
+                <button onClick={testProviderKey} disabled={providerBusy || !providerKey} className="px-3 py-2 rounded-lg bg-neutral-800 text-xs text-white disabled:opacity-50">{providerBusy ? 'Checking…' : 'Validate key and load models'}</button>
+                {providerModels.length > 0 && <>
+                  <select aria-label="Choose provider model" value={selectedProviderModel} onChange={e => setSelectedProviderModel(e.target.value)} className="max-w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white">{providerModels.map(model => <option key={model.id} value={model.id}>{model.displayName} ({model.id})</option>)}</select>
+                  <button onClick={saveModelConnection} disabled={providerBusy || !selectedProviderModel} className="px-3 py-2 rounded-lg bg-violet-600 text-xs font-semibold text-white disabled:opacity-50">Save model</button>
+                </>}
+              </div>
+            </div>
+            <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-5 space-y-3">
+              <h3 className="text-sm font-semibold text-white">Connected models</h3>
+              {!modelConnections.length ? <p className="text-xs text-neutral-500">No models connected yet.</p> : modelConnections.map(connection => <div key={connection.id} className="flex items-center justify-between gap-3 rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+                <div><div className="text-sm text-white">{connection.displayName}</div><div className="text-[11px] text-neutral-500">{connection.provider} · {connection.modelId} · key stored encrypted</div><div className={`text-[10px] mt-1 ${modelConnectionChecks[connection.id]?.status === 'CONNECTED' ? 'text-emerald-400' : modelConnectionChecks[connection.id]?.status === 'ERROR' ? 'text-rose-300' : 'text-neutral-500'}`}>{modelConnectionChecks[connection.id]?.status || 'Saved'}{modelConnectionChecks[connection.id]?.error ? ` · ${modelConnectionChecks[connection.id].error}` : ''}</div></div>
+                <div className="flex items-center gap-1"><button onClick={() => testSavedModelConnection(connection.id)} aria-label={`Test ${connection.displayName}`} className="p-2 text-neutral-400 hover:text-white"><RefreshCw className="w-4 h-4" /></button><button onClick={() => deleteModelConnection(connection.id)} aria-label={`Remove ${connection.displayName}`} className="p-2 text-neutral-500 hover:text-rose-300"><Trash2 className="w-4 h-4" /></button></div>
+              </div>)}
+              <p className="text-[11px] text-amber-300/80">Model calls can incur provider charges. Benchmarks run only after you start one. Cost is shown as unavailable unless provider pricing is configured.</p>
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'model-leaderboard' && (
+          <section className="max-w-5xl mx-auto bg-neutral-900/60 border border-neutral-800 rounded-xl p-5 space-y-4">
+            <div><h2 className="text-white font-bold">Model Leaderboard</h2><p className="text-xs text-neutral-400">Only task responses with explicit exact-answer evaluation are ranked. Code outputs remain unverified without sandbox execution.</p></div>
+            <div className="flex flex-wrap gap-2">
+              <select value={modelLeaderboardCategory} onChange={e => setModelLeaderboardCategory(e.target.value)} className="bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white"><option value="ALL">All categories</option>{Array.from(new Set(tasks.map(task => task.category))).sort().map(category => <option key={category} value={category}>{category}</option>)}</select>
+              <select value={modelLeaderboardRunId} onChange={e => setModelLeaderboardRunId(e.target.value)} className="bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white"><option value="ALL">All runs</option>{runs.filter(run => run.modelExecutions?.length).map(run => <option key={run.id} value={run.id}>{run.title}</option>)}</select>
+            </div>
+            {!modelLeaderboard.length ? <p className="text-xs text-neutral-500 py-8 text-center">No verified model scores yet. Use an Exact text or Exact JSON task to create a score.</p> : modelLeaderboard.map((entry, index) => <div key={`${entry.runId}-${entry.modelId}-${index}`} className="grid grid-cols-2 md:grid-cols-7 gap-2 border-b border-neutral-800 py-3 text-xs text-neutral-300">
+              <span>#{entry.rank} {entry.provider}</span><span className="md:col-span-2">{entry.modelId}</span><span>{entry.category}</span><span>Accuracy {entry.accuracyScore}%</span><span>Latency {entry.speedScore}%</span><strong className="text-violet-300">{entry.overallScore}/100</strong>
+            </div>)}
+          </section>
+        )}
 
         {/* TAB: LEADERBOARD (Stage 6) */}
         {activeTab === 'leaderboard' && (
@@ -1563,7 +1688,21 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
                       </div>
                     </div>
 
-                    {evaluations.length === 0 ? (
+                    {viewingRun.modelExecutions?.length ? (
+                      <div className="space-y-3">
+                        {viewingRun.modelExecutions.map(execution => <article key={execution.id} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+                          <div className="flex flex-wrap justify-between gap-2 text-xs"><strong className="text-white">{execution.provider} · {execution.modelId}</strong><span className="text-neutral-400">{execution.status} · {execution.durationMs ?? '—'} ms · {execution.inputTokens ?? '—'}/{execution.outputTokens ?? '—'} tokens</span></div>
+                          {execution.errorMessage && <p className="mt-2 text-xs text-rose-300">{execution.errorMessage}</p>}
+                          {execution.rawOutput && <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-neutral-900 p-3 text-xs text-neutral-200">{execution.rawOutput}</pre>}
+                          <p className="mt-2 text-[11px] text-neutral-500">{execution.evaluation?.evaluationStatus || 'Evaluation pending'} · Accuracy {execution.evaluation?.accuracyScore == null ? 'unavailable' : `${execution.evaluation.accuracyScore}%`} · Cost unavailable unless pricing is configured.</p>
+                          {Boolean((execution.evaluation?.breakdown as any)?.semanticReview) && <p className="mt-1 text-[11px] text-violet-300">Optional Bifrost review: {(execution.evaluation?.breakdown as any).semanticReview.score}/100 · {(execution.evaluation?.breakdown as any).semanticReview.model}</p>}
+                        </article>)}
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => handleEvaluateRun(true)} disabled={isEvaluating} className="px-3 py-2 rounded-lg bg-violet-600 text-xs font-medium text-white disabled:opacity-50">{isEvaluating ? 'Evaluating…' : 'Evaluate model responses'}</button>
+                          <button onClick={() => handleEvaluateRun(true, true)} disabled={isEvaluating} className="px-3 py-2 rounded-lg bg-neutral-800 text-xs font-medium text-neutral-200 disabled:opacity-50">Request optional Bifrost semantic review</button>
+                        </div>
+                      </div>
+                    ) : evaluations.length === 0 ? (
                       <div className="p-4 rounded-lg bg-neutral-950/60 border border-neutral-800/80 text-xs text-neutral-400 flex items-center justify-between">
                         <div>
                           <p className="font-semibold text-neutral-200 mb-0.5">Execution Completed — Awaiting Evaluation</p>
@@ -1593,7 +1732,7 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
                                   <div>
                                     <div className="flex items-center space-x-2">
                                       <span className="font-bold text-sm text-neutral-100">{ev.agentName}</span>
-                                      {idx === 0 && ev.overallScore > 0 && (
+                                      {idx === 0 && ev.overallScore !== null && ev.overallScore > 0 && (
                                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800/80">
                                           Top Performer
                                         </span>
@@ -1606,9 +1745,9 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
 
                                   <div className="text-right">
                                     <div className="text-xl font-black text-cyan-400 font-mono">
-                                      {ev.overallScore}<span className="text-xs text-neutral-500 font-normal">/100</span>
+                                      {ev.overallScore ?? 'N/A'}{ev.overallScore !== null && <span className="text-xs text-neutral-500 font-normal">/100</span>}
                                     </div>
-                                    <span className="text-[10px] text-neutral-400 font-medium">Overall Score</span>
+                                    <span className="text-[10px] text-neutral-400 font-medium">{ev.evaluationStatus === 'HEURISTIC' ? 'Heuristic score' : ev.evaluationStatus === 'UNVERIFIED' ? 'Correctness unverified' : 'Overall Score'}</span>
                                   </div>
                                 </div>
 
@@ -1617,10 +1756,10 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
                                   <div>
                                     <div className="flex justify-between text-[11px] mb-0.5 text-neutral-400">
                                       <span>Accuracy (40%)</span>
-                                      <span className="text-neutral-200">{ev.accuracyScore}%</span>
+                                      <span className="text-neutral-200">{ev.accuracyScore === null ? 'N/A' : `${ev.accuracyScore}%`}</span>
                                     </div>
                                     <div className="h-1.5 bg-neutral-900 rounded-full overflow-hidden">
-                                      <div className="h-full bg-cyan-500 rounded-full" style={{ width: `${ev.accuracyScore}%` }} />
+                                      <div className="h-full bg-cyan-500 rounded-full" style={{ width: `${ev.accuracyScore ?? 0}%` }} />
                                     </div>
                                   </div>
 
@@ -2004,7 +2143,7 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
             <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
               <div className="flex items-center space-x-2">
                 <Flame className="w-5 h-5 text-amber-400 fill-current" />
-                <h2 className="text-base font-bold text-white">Configure Benchmark Battle</h2>
+                <h2 className="text-base font-bold text-white">Configure Benchmark</h2>
               </div>
               <button onClick={() => setIsNewRunModalOpen(false)} className="text-neutral-500 hover:text-white">✕</button>
             </div>
@@ -2039,11 +2178,15 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
               )}
             </div>
 
-            {/* Step 2: Select >= 2 Agents */}
-            <div>
+            {/* Step 2: Select same-kind comparison targets */}
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setRunMode('agents')} className={`px-3 py-2 rounded-lg text-xs ${runMode === 'agents' ? 'bg-amber-500 text-neutral-950' : 'bg-neutral-800 text-neutral-300'}`}>HTTP Agents</button>
+              <button type="button" onClick={() => setRunMode('models')} className={`px-3 py-2 rounded-lg text-xs ${runMode === 'models' ? 'bg-violet-500 text-neutral-950' : 'bg-neutral-800 text-neutral-300'}`}>AI Models</button>
+            </div>
+            {runMode === 'agents' && <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-semibold text-neutral-300">
-                  2. Select Competing Agents (Minimum 2 Required) *
+                  2. Select HTTP Agents (Minimum 2) *
                 </label>
                 <span className="text-[11px] font-mono text-amber-400">
                   {selectedAgentIds.length} Selected
@@ -2093,7 +2236,14 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
                   );
                 })}
               </div>
-            </div>
+            </div>}
+            {runMode === 'models' && <div>
+              <div className="flex items-center justify-between mb-1"><label className="text-xs font-semibold text-neutral-300">2. Select connected models (Minimum 2) *</label><span className="text-[11px] font-mono text-violet-300">{selectedModelIds.length} Selected</span></div>
+              {!modelConnections.length ? <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-400">Connect models in the Model Connections tab first.</div> : <div className="space-y-2 max-h-52 overflow-y-auto pr-1">{modelConnections.map(model => {
+                const checked = selectedModelIds.includes(model.id);
+                return <button type="button" key={model.id} onClick={() => setSelectedModelIds(previous => checked ? previous.filter(id => id !== model.id) : [...previous, model.id])} className={`w-full text-left p-3 rounded-lg border ${checked ? 'bg-violet-950/30 border-violet-700 text-white' : 'bg-neutral-950 border-neutral-800 text-neutral-300'}`}><span className="font-medium">{model.displayName}</span><span className="block text-[10px] text-neutral-500">{model.provider} · {model.modelId}</span></button>;
+              })}</div>}
+            </div>}
 
             {/* Step 3: Run Title Optional */}
             <div>
@@ -2120,7 +2270,7 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
               </button>
               <button
                 type="button"
-                disabled={isLaunchingRun || selectedAgentIds.length < 2}
+                disabled={isLaunchingRun || (runMode === 'agents' ? selectedAgentIds.length < 2 : selectedModelIds.length < 2)}
                 onClick={handleLaunchRun}
                 className="px-5 py-2 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-neutral-950 transition flex items-center space-x-1.5 disabled:opacity-50"
               >
@@ -2241,6 +2391,22 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
                   className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs font-mono text-neutral-200 focus:outline-none focus:border-cyan-500"
                 />
               </div>
+
+              <div>
+                <label className="block text-xs font-medium text-neutral-300 mb-1">Evaluation method</label>
+                <select value={taskFormStrategy} onChange={e => setTaskFormStrategy(e.target.value as EvaluationStrategy)} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200">
+                  <option value="CODE_UNVERIFIED">Code response — correctness unverified</option>
+                  <option value="EXACT_MATCH">Exact text answer</option>
+                  <option value="JSON_EXACT">Exact JSON value</option>
+                  <option value="HEURISTIC_TEXT">Text heuristic (not proof of correctness)</option>
+                </select>
+              </div>
+              {taskFormStrategy !== 'CODE_UNVERIFIED' && (
+                <div>
+                  <label className="block text-xs font-medium text-neutral-300 mb-1">Expected answer</label>
+                  <textarea rows={2} value={taskFormExpected} onChange={e => setTaskFormExpected(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs font-mono text-neutral-200" placeholder="Expected response value" />
+                </div>
+              )}
 
               <div className="pt-3 border-t border-neutral-800 flex justify-end space-x-2">
                 <button

@@ -34,3 +34,23 @@ Status meanings follow the audit request. “Tested” can mean an automated com
 - **Implemented:** 22/24 (92%); includes partial and unverified code paths, and is not a readiness score.
 - **Tested at some automated/component level:** 17/24 (71%); this does not mean all tested items passed a live or complete workflow.
 - **End-to-end verified:** 12/24 (50%); uses local PostgreSQL and mock HTTP/Bifrost services. It excludes live Redis, live Bifrost, UI browser tests, and code correctness execution.
+
+## Dual-mode benchmark additions (2026-11-20)
+
+| Feature | Status | Evidence and limitation |
+|---|---|---|
+| Gemini, OpenAI, Anthropic, DeepSeek adapters/model listing | Implemented; contract-tested | Auth/request/response fixtures pass; live credentials not used |
+| Encrypted owner-scoped credentials/model connections | Implemented; component-tested | AES authenticated encryption and ownership; migration not applied in this run |
+| Model runs and separate leaderboard | Implemented; orchestration-tested | Real API + PostgreSQL + BullMQ path NOT VERIFIED |
+| Evaluation strategies and provenance | Implemented; unit-tested | Code defaults unverified; exact text/JSON available; heuristic scores labeled/excluded from ranked scores; semantic review separate |
+
+Earlier end-to-end counts describe the prior HTTP-agent inventory and do not include this work. Full API/database/queue integration is still unverified.
+
+## Verification continuation
+
+- Migration SQL static audit: PASS, additive/non-destructive; actual applied schema and historical row preservation: NOT VERIFIED.
+- Model database workflow and existing HTTP-agent regression: BLOCKED by PostgreSQL being offline.
+- BullMQ retry/restart/disconnection/recovery: BLOCKED by missing dedicated test Redis.
+- All four provider mock adapters including unsupported models: PASS; live providers remain NOT VERIFIED.
+
+Latest environment recheck (2026-11-21): PostgreSQL/model persistence and historical-data regression BLOCKED by unavailable `agentarena_test`; live BullMQ lifecycle BLOCKED by missing isolated Redis URL. Offline regression and provider mocks PASS.

@@ -1,9 +1,11 @@
 import crypto from 'crypto';
 import { runtimeDb } from './runtime-db';
 import { AgentHttpAdapter } from './http-adapter';
-import { BenchmarkRun, AgentExecution, CreateRunInput } from '../types/benchmark';
+import { BenchmarkRun, AgentExecution, CreateRunInput, ModelBenchmarkExecution } from '../types/benchmark';
 import { StandardizedAgentRequest } from '../types/agent';
 import type { AuthUser } from './auth';
+import { modelDb } from './model-db';
+import { buildBenchmarkPrompt, modelAdapters, ModelProviderError, withModelConcurrency } from './model-providers';
 
 // Set of actively running run IDs to prevent duplicate execution attempts
 const activeRuns = new Set<string>();
@@ -24,6 +26,7 @@ export class BenchmarkOrchestrator {
     if (process.env.NODE_ENV === 'production' && options.waitForCompletion) {
       throw new Error('Synchronous benchmark execution is disabled in production.');
     }
+    if (input.modelConnectionIds) return this.createModelRun(input, options);
     // 1. Validation: At least two agents required
     if (!input.agentIds || input.agentIds.length < 2) {
       throw new Error('At least two eligible agents must be selected for a benchmark run.');
@@ -114,11 +117,63 @@ export class BenchmarkOrchestrator {
     return (await runtimeDb.getRun(runId, options.actor))!;
   }
 
+  private static async createModelRun(input: CreateRunInput, options: OrchestrationOptions): Promise<BenchmarkRun> {
+    if (!input.modelConnectionIds || input.modelConnectionIds.length < 2 || input.modelConnectionIds.length > 8) {
+      throw new Error('Choose between 2 and 8 models for a benchmark.');
+    }
+    const ids = Array.from(new Set(input.modelConnectionIds));
+    if (ids.length < 2) throw new Error('Choose at least two different models.');
+    const task = await runtimeDb.getTask(input.taskId, options.actor);
+    if (!task) throw new Error(`Task with ID ${input.taskId} not found.`);
+    if (!options.actor) throw new Error('Authentication is required to run models.');
+    const connections = await Promise.all(ids.map(id => modelDb.getWithKey(id, options.actor!)));
+    if (connections.some(connection => !connection)) throw new Error('One or more selected model connections were not found.');
+    const runId = `run-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+    const now = new Date().toISOString();
+    const modelExecutions: ModelBenchmarkExecution[] = connections.map(item => ({
+      id: `model-exec-${crypto.randomUUID()}`, runId, connectionId: item!.connection.id,
+      provider: item!.connection.provider, modelId: item!.connection.modelId,
+      requestId: `model-req-${crypto.randomUUID()}`, status: 'QUEUED', startedAt: now,
+      completedAt: null, durationMs: null, inputTokens: null, outputTokens: null,
+      errorMessage: null, rawOutput: null, evaluation: null,
+    }));
+    const run: BenchmarkRun = {
+      id: runId, title: input.title || `Model comparison: ${task.title}`,
+      taskId: task.id, taskTitle: task.title, taskLanguage: task.language, taskDescription: task.description,
+      taskDifficulty: task.difficulty, agentIds: [], status: 'QUEUED', startedAt: now,
+      completedAt: null, durationMs: null, executions: [], modelExecutions, createdAt: now,
+    };
+    await runtimeDb.createRun(run, options.actor);
+    if (!options.waitForCompletion) {
+      const { queueService } = await import('./infrastructure/queue');
+      const queued = await queueService.enqueueRunJob(runId, { runId });
+      if (queued.enqueued) return run;
+      if (process.env.NODE_ENV === 'production') {
+        for (const execution of modelExecutions) await runtimeDb.updateModelExecution(runId, execution.id, {
+          status: 'FAILED', completedAt: new Date().toISOString(), errorMessage: 'Background queue is unavailable; execution was not started.',
+        });
+        return (await runtimeDb.getRun(runId, options.actor))!;
+      }
+    }
+    await this.executeModelRun(runId, task);
+    return (await runtimeDb.getRun(runId, options.actor))!;
+  }
+
   /** Reloads persisted run context for BullMQ worker execution. */
   static async resumeRun(runId: string): Promise<void> {
     let run = await runtimeDb.getRun(runId);
     if (!run) throw new Error(`Benchmark run ${runId} was not found`);
     if (['COMPLETED', 'FAILED', 'PARTIALLY_FAILED'].includes(run.status)) return;
+    if (run.modelExecutions?.length) {
+      for (const execution of run.modelExecutions.filter(item => item.status === 'RUNNING')) {
+        await runtimeDb.updateModelExecution(runId, execution.id, { status: 'QUEUED', completedAt: null, errorMessage: 'Execution restarted after worker interruption.' });
+      }
+      run = (await runtimeDb.getRun(runId))!;
+      const task = await runtimeDb.getTask(run.taskId);
+      if (!task) throw new Error(`Benchmark task ${run.taskId} was not found`);
+      await this.executeModelRun(runId, task);
+      return;
+    }
     for (const execution of run.executions.filter((item) => item.status === 'RUNNING')) {
       await runtimeDb.updateExecution(runId, execution.id, {
         status: 'QUEUED', completedAt: null, errorMessage: 'Execution restarted after worker interruption.',
@@ -130,6 +185,47 @@ export class BenchmarkOrchestrator {
     const agents = (await Promise.all(run.executions.filter(e => e.status === 'QUEUED').map(e => runtimeDb.getAgentWithSecret(e.agentId)))).filter((v): v is NonNullable<typeof v> => Boolean(v));
     if (!agents.length) return;
     await this.executeRun(runId, task, agents);
+  }
+
+  private static async executeModelRun(runId: string, task: NonNullable<Awaited<ReturnType<typeof runtimeDb.getTask>>>): Promise<void> {
+    if (activeRuns.has(runId)) return;
+    activeRuns.add(runId);
+    try {
+      const run = await runtimeDb.getRun(runId);
+      const pending = run?.modelExecutions?.filter(execution => execution.status === 'QUEUED') || [];
+      // Bound provider concurrency to limit bursts and accidental spend.
+      for (let index = 0; index < pending.length; index += 3) {
+        await Promise.allSettled(pending.slice(index, index + 3).map(async execution => {
+          const context = execution.connectionId ? await modelDb.getForWorker(execution.connectionId) : null;
+          if (!context) {
+            await runtimeDb.updateModelExecution(runId, execution.id, { status: 'FAILED', completedAt: new Date().toISOString(), errorMessage: 'Provider connection is unavailable.' });
+            return;
+          }
+          const startedAt = Date.now();
+          let providerStartedAt = 0;
+          await runtimeDb.updateModelExecution(runId, execution.id, { status: 'RUNNING', startedAt: new Date().toISOString(), errorMessage: null });
+          try {
+            const result = await withModelConcurrency(() => {
+              providerStartedAt = Date.now();
+              return modelAdapters[context.connection.provider].execute(
+                context.apiKey, context.connection.modelId, buildBenchmarkPrompt(task), Math.min(task.timeoutSeconds || 60, 300) * 1000,
+              );
+            });
+            await runtimeDb.updateModelExecution(runId, execution.id, {
+              status: 'COMPLETED', completedAt: new Date().toISOString(), durationMs: result.durationMs,
+              inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens, rawOutput: result.content,
+            });
+          } catch (error) {
+            const timedOut = error instanceof ModelProviderError && error.statusCode === 504;
+            await runtimeDb.updateModelExecution(runId, execution.id, {
+              status: timedOut ? 'TIMED_OUT' : 'FAILED', completedAt: new Date().toISOString(), durationMs: Date.now() - (providerStartedAt || startedAt),
+              errorMessage: error instanceof ModelProviderError ? error.message : 'Model execution failed.',
+            });
+          }
+        }));
+      }
+      await runtimeDb.refreshRunStatus(runId);
+    } finally { activeRuns.delete(runId); }
   }
 
   /**
@@ -213,7 +309,7 @@ export class BenchmarkOrchestrator {
               outputTokens: resData.metrics?.outputTokens ?? null,
               rawOutput: resData.result?.content || '',
               files: resData.result?.files,
-              metadata: resData.metadata || {},
+              metadata: { ...(resData.metadata || {}), tokenUsageSource: 'agent-reported-unverified' },
               errorMessage: null,
             });
           } else {
@@ -230,7 +326,7 @@ export class BenchmarkOrchestrator {
               outputTokens: execResult.response?.metrics?.outputTokens ?? null,
               rawOutput: execResult.response?.result?.content || null,
               errorMessage: execResult.errorMessage || 'Agent execution failed',
-              metadata: execResult.response?.metadata || {},
+              metadata: { ...(execResult.response?.metadata || {}), tokenUsageSource: 'agent-reported-unverified' },
             });
           }
         } catch (err: any) {

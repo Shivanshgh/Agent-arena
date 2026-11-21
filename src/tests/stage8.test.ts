@@ -100,7 +100,7 @@ async function runStage8Tests() {
 
   const evalSuccess = engine.evaluateExecution(mockTask, mockExecSuccess);
   assert(
-    evalSuccess.costEfficiencyScore === null && evalSuccess.overallScore > 0,
+    evalSuccess.costEfficiencyScore === null && (evalSuccess.overallScore ?? 0) > 0,
     'Stage 5 Engine: Unmeasured tokens yield null cost score without penalizing agent'
   );
 

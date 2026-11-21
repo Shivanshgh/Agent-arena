@@ -56,16 +56,16 @@ export interface ExecutionEvaluation {
   agentId: string;
   agentName: string;
   taskId: string;
-  accuracyScore: number;         // 0 - 100
+  accuracyScore: number | null;  // null when no correctness strategy was configured
   completionScore: number;       // 0 - 100
   reliabilityScore: number;      // 0 - 100
   speedScore: number;            // 0 - 100
   costEfficiencyScore: number | null; // 0 - 100 or null if tokens unmeasured
-  overallScore: number;          // 0 - 100
+  overallScore: number | null;   // null when correctness is unverified
   passedTestCount: number;
   failedTestCount: number;
   totalTestCount: number;
-  evaluationStatus: 'EVALUATED' | 'FAILED' | 'SKIPPED';
+  evaluationStatus: 'EVALUATED' | 'HEURISTIC' | 'UNVERIFIED' | 'FAILED' | 'SKIPPED';
   evaluationVersion: string;     // e.g. "1.0.0"
   breakdown: EvaluationBreakdown;
   evaluatedAt: string;

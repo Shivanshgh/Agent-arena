@@ -14,6 +14,9 @@ import { BifrostGateway } from './infrastructure/bifrost';
 import { reviewSemanticCorrectness, SemanticReviewError } from './semantic-review';
 import { authRateLimit, clearSessionCookie, loginUser, registerUser, revokeSession, setSessionCookie } from './auth';
 import { z } from 'zod';
+import { modelAdapters, ModelProviderError } from './model-providers';
+import type { ModelProviderId } from './model-providers';
+import { modelDb } from './model-db';
 
 export const apiRouter = express.Router();
 for (const method of ['get', 'post', 'put', 'delete', 'patch'] as const) {
@@ -480,6 +483,9 @@ apiRouter.post('/tasks', async (req: Request, res: Response) => {
       issues: parsed.error.issues.map(i => ({ field: i.path.join('.'), message: i.message })),
     });
   }
+  if (['EXACT_MATCH', 'JSON_EXACT'].includes(parsed.data.evaluationStrategy) && !parsed.data.expectedOutput?.trim()) {
+    return res.status(400).json({ success: false, error: 'Exact text and JSON evaluation require an expected answer.' });
+  }
 
   const task = await runtimeDb.createTask(parsed.data, req.authUser);
   res.status(201).json({ success: true, data: task });
@@ -500,6 +506,9 @@ apiRouter.put('/tasks/:id', async (req: Request, res: Response) => {
       issues: parsed.error.issues.map(i => ({ field: i.path.join('.'), message: i.message })),
     });
   }
+  if (parsed.data.evaluationStrategy && ['EXACT_MATCH', 'JSON_EXACT'].includes(parsed.data.evaluationStrategy) && !(parsed.data.expectedOutput ?? existing.expectedOutput)?.trim()) {
+    return res.status(400).json({ success: false, error: 'Exact text and JSON evaluation require an expected answer.' });
+  }
 
   const updated = await runtimeDb.updateTask(req.params.id, parsed.data, req.authUser);
   res.json({ success: true, data: updated });
@@ -517,6 +526,71 @@ apiRouter.delete('/tasks/:id', async (req: Request, res: Response) => {
 // ==========================================
 // 5. Benchmark Execution Orchestration Endpoints
 // ==========================================
+
+const ModelProviderSchema = z.enum(['GEMINI', 'OPENAI', 'ANTHROPIC', 'DEEPSEEK']);
+const ModelKeyInputSchema = z.object({ provider: ModelProviderSchema, apiKey: z.string().trim().min(8).max(512) }).strict();
+apiRouter.get('/model-connections', async (req: Request, res: Response) => {
+  if (!runtimeDb.isPrismaEnabled || !req.authUser) return res.status(503).json({ success: false, error: 'Model connections require the configured PostgreSQL database.' });
+  res.json({ success: true, data: await modelDb.list(req.authUser) });
+});
+
+apiRouter.post('/model-providers/test', authRateLimit(), async (req: Request, res: Response) => {
+  const parsed = ModelKeyInputSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ success: false, error: 'Choose a provider and enter its API key.' });
+  try {
+    const models = await modelAdapters[parsed.data.provider].listModels(parsed.data.apiKey);
+    if (!models.length) return res.status(422).json({ success: false, error: 'This provider key has no models available through the selected API.' });
+    res.json({ success: true, data: { provider: parsed.data.provider, models } });
+  } catch (error) {
+    const status = error instanceof ModelProviderError ? (error.statusCode === 401 || error.statusCode === 403 ? 401 : 502) : 502;
+    res.status(status).json({ success: false, error: error instanceof ModelProviderError ? error.message : 'Provider connection failed.' });
+  }
+});
+
+apiRouter.post('/model-connections', authRateLimit(), async (req: Request, res: Response) => {
+  if (!runtimeDb.isPrismaEnabled || !req.authUser) return res.status(503).json({ success: false, error: 'Model connections require the configured PostgreSQL database.' });
+  const parsed = z.object({ ...ModelKeyInputSchema.shape, modelId: z.string().trim().min(1).max(200) }).strict().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ success: false, error: 'Choose a provider, API key, and model.' });
+  try {
+    const models = await modelAdapters[parsed.data.provider].listModels(parsed.data.apiKey);
+    if (!models.length) return res.status(422).json({ success: false, error: 'This provider key has no models available through the selected API.' });
+    const model = models.find(item => item.id === parsed.data.modelId);
+    if (!model) return res.status(400).json({ success: false, error: 'That model is not available for this provider key.' });
+    const connection = await modelDb.upsert(req.authUser, parsed.data.provider, parsed.data.apiKey, model.id, model.displayName);
+    res.status(201).json({ success: true, data: connection });
+  } catch (error) {
+    const status = error instanceof ModelProviderError ? (error.statusCode === 401 || error.statusCode === 403 ? 401 : 502) : 503;
+    res.status(status).json({ success: false, error: error instanceof ModelProviderError ? error.message : 'Could not securely save this provider connection.' });
+  }
+});
+
+apiRouter.post('/model-connections/:id/test', authRateLimit(), async (req: Request, res: Response) => {
+  if (!req.authUser) return res.status(401).json({ success: false, error: 'Authentication required.' });
+  const saved = await modelDb.getWithKey(req.params.id, req.authUser);
+  if (!saved) return res.status(404).json({ success: false, error: 'Model connection not found.' });
+  try {
+    const models = await modelAdapters[saved.connection.provider].listModels(saved.apiKey);
+    const available = models.some(model => model.id === saved.connection.modelId);
+    return res.json({ success: true, data: { status: available ? 'CONNECTED' : 'MODEL_UNAVAILABLE', modelId: saved.connection.modelId } });
+  } catch (error) {
+    const status = error instanceof ModelProviderError ? (error.statusCode === 401 || error.statusCode === 403 ? 401 : 502) : 502;
+    return res.status(status).json({ success: false, data: { status: 'ERROR' }, error: error instanceof ModelProviderError ? error.message : 'Provider connection failed.' });
+  }
+});
+
+apiRouter.delete('/model-connections/:id', async (req: Request, res: Response) => {
+  if (!req.authUser) return res.status(401).json({ success: false, error: 'Authentication required.' });
+  const deleted = await modelDb.deleteConnection(req.params.id, req.authUser);
+  res.status(deleted ? 200 : 404).json({ success: deleted, error: deleted ? undefined : 'Model connection not found.' });
+});
+
+apiRouter.delete('/model-providers/:provider/credential', async (req: Request, res: Response) => {
+  if (!req.authUser) return res.status(401).json({ success: false, error: 'Authentication required.' });
+  const provider = ModelProviderSchema.safeParse(req.params.provider.toUpperCase());
+  if (!provider.success) return res.status(400).json({ success: false, error: 'Unsupported provider.' });
+  const deleted = await modelDb.deleteProviderKey(provider.data as ModelProviderId, req.authUser);
+  res.status(deleted ? 200 : 404).json({ success: deleted, error: deleted ? undefined : 'Provider credential not found.' });
+});
 
 // List all benchmark runs
 apiRouter.get('/runs', async (req: Request, res: Response) => {
@@ -554,7 +628,7 @@ apiRouter.post('/runs', async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       data: run,
-      message: run.executions.some(e => e.errorMessage === 'Background queue is unavailable; execution was not started.')
+      message: [...run.executions, ...(run.modelExecutions || [])].some(e => e.errorMessage === 'Background queue is unavailable; execution was not started.')
         ? 'Run recorded but not started because the background queue is unavailable.'
         : 'Benchmark run orchestrated successfully',
     });
@@ -575,12 +649,12 @@ apiRouter.get('/evaluations/config', (_req: Request, res: Response) => {
   res.json({
     success: true,
     data: {
-      version: '1.0.0',
+      version: '1.1.0',
       weights: DEFAULT_EVALUATION_WEIGHTS,
       criteria: [
-        { name: 'Accuracy / Correctness', weight: '40%', description: 'Code structure, language syntax, expected output alignment' },
-        { name: 'Task Completion', weight: '25%', description: 'Non-empty valid solution produced under status COMPLETED' },
-        { name: 'Reliability', weight: '15%', description: 'Zero unhandled exceptions or crash dumps during execution' },
+        { name: 'Accuracy / Correctness', weight: '40%', description: 'Exact text or canonical JSON comparison when configured; code correctness remains unverified without isolated execution' },
+        { name: 'Task Completion', weight: '25%', description: 'A non-empty response completed successfully' },
+        { name: 'Reliability', weight: '15%', description: 'The agent or provider request completed without transport failure' },
         { name: 'Execution Speed', weight: '10%', description: 'Normalized execution duration vs allocated time budget' },
         { name: 'Cost Efficiency', weight: '10%', description: 'Token consumption efficiency (dynamically re-normalized if unavailable)' },
       ],
@@ -618,6 +692,25 @@ apiRouter.post('/runs/:id/evaluate', async (req: Request, res: Response) => {
   }
 
   const recalculate = req.query.recalculate === 'true' || parsed.data.recalculate;
+  if (run.modelExecutions?.length) {
+    const evaluated = run.modelExecutions.some(execution => execution.evaluation);
+    if (evaluated && !recalculate && !parsed.data.aiAssisted) return res.json({ success: true, data: run.modelExecutions.map(execution => ({ ...execution, evaluation: execution.evaluation })), cached: true });
+    if (!evaluated || recalculate) await modelDb.evaluateRun(run.id, task, run.modelExecutions);
+    if (parsed.data.aiAssisted) {
+      try {
+        const reviews = await Promise.all(run.modelExecutions.filter(execution => execution.status === 'COMPLETED').map(async execution => ({
+          executionId: execution.id,
+          review: await reviewSemanticCorrectness(task, { status: execution.status, rawOutput: execution.rawOutput } as any),
+        })));
+        await modelDb.attachSemanticReviews(reviews);
+      } catch (error) {
+        const status = error instanceof SemanticReviewError ? error.statusCode : 502;
+        return res.status(status).json({ success: false, error: error instanceof SemanticReviewError ? error.message : 'AI semantic review failed; deterministic model scores were retained.' });
+      }
+    }
+    const refreshed = await runtimeDb.getRun(run.id, req.authUser);
+    return res.json({ success: true, data: refreshed?.modelExecutions || [], cached: false });
+  }
   const existingEvals = await runtimeDb.listEvaluations(run.id);
 
   if (existingEvals.length > 0 && !recalculate && !parsed.data.aiAssisted) {
@@ -692,6 +785,14 @@ apiRouter.get('/evaluations/:id', async (req: Request, res: Response) => {
 // ==========================================
 
 // Global Leaderboard with filters
+apiRouter.get('/leaderboard/models', async (req: Request, res: Response) => {
+  if (!req.authUser) return res.status(401).json({ success: false, error: 'Authentication required.' });
+  const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+  const runId = typeof req.query.runId === 'string' ? req.query.runId : undefined;
+  const data = await modelDb.leaderboard(req.authUser, { category, runId });
+  res.json({ success: true, data, count: data.length, filters: { category, runId } });
+});
+
 apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
   const language = req.query.language as string | undefined;
   const category = req.query.category as string | undefined;

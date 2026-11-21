@@ -44,3 +44,81 @@ All safe local work is complete. Live queue verification remains blocked until a
 - PostgreSQL integration entry point: `node scripts/test-postgres-integration.mjs`; inspect target restrictions before running.
 - BullMQ integration entry point: `node scripts/test-bullmq-integration.mjs`; inspect target restrictions before running.
 - Keep `DATABASE_URL`, `REDIS_URL`, API keys, and passwords private.
+
+## Latest session checkpoint — 2026-11-20
+
+Completed: reviewed existing audit; prepared PostgreSQL API integration scenario for three separate HTTP protocol agents (correct, partial, incorrect); made cleanup skip DB cleanup if connection never succeeded; reviewed scoring behavior; attempted queue/DB checks; ran `npm test`, `npm run lint`, `npm run build`.
+
+Results: local Postgres test BLOCKED (`127.0.0.1:5432` unavailable); dedicated BullMQ Redis BLOCKED (`AGENTARENA_TEST_REDIS_URL` absent); full `npm test` invocation had local fixture access failures in Stage 3 but later stages passed; lint/build PASS. Scoring heuristic is shown to be vulnerable to expected-output text gaming; do not execute submitted code unsandboxed. Live Render is NOT VERIFIED.
+
+Files modified this session: `scripts/test-postgres-integration.mjs`, plus `audit-report/TEST_RESULTS.md`, `BUG_REPORT.md`, `PRODUCT_READINESS.md`, `REMAINING_WORK.md`, and this file. No secrets printed, production DB/Redis untouched, no commit/push.
+
+Exact next steps: (1) start local PostgreSQL service and rerun `npm run test:postgres`; (2) configure a dedicated disposable Redis as `AGENTARENA_TEST_REDIS_URL` and run `npm run test:bullmq`; (3) enable localhost fixture access and rerun `npm test`; (4) deploy to Render and validate real worker job + persisted results in dashboard; (5) implement sandboxed test-case execution before treating scores as solution correctness.
+
+## Dual-mode benchmarking implementation (2026-11-20)
+
+Implemented provider adapters for Gemini/OpenAI/Anthropic/DeepSeek, encrypted owner-scoped credentials, model connections/executions/evaluations, shared queued runs, separate model leaderboard, strategy selection, exact text/canonical JSON checks, and optional Bifrost semantic review stored separately. Existing HTTP-agent workflow remains. Code evaluation defaults to unverified; heuristic scores are labeled and excluded from scored leaderboards. README/UI updated.
+
+Verification: full `npm test` with loopback fixture access PASS (Stages 3–8: 66 checks; auth/ownership, Bifrost, provider contracts/errors, model orchestration pass). Restricted run initially denied loopback; fixture-enabled rerun passed. Prisma validate/generate, TypeScript, and build PASS. PostgreSQL integration BLOCKED (P1001; local service unavailable); dedicated Redis integration NOT RUN; live providers and Render NOT VERIFIED. No hosted Redis/live credentials used; candidate code not executed.
+
+Files added: `prisma/migrations/20261120120000_model_benchmarking/`, `src/server/model-db.ts`, `src/server/model-providers.ts`, `src/tests/model-orchestration.test.ts`, `src/tests/model-providers.test.ts`. Other modified implementation, README, and audit files are in `git status`; no commit/push.
+
+Resume: start isolated `agentarena_test` PostgreSQL and run `npm run test:postgres`; configure disposable `AGENTARENA_TEST_REDIS_URL` and run `npm run test:bullmq`; optionally configure providers locally for live calls; review/apply migration and verify Render web/worker queue. Remaining product limitation: no sandboxed code execution.
+
+## Verification continuation (2026-11-20)
+
+- Migration review: **PASS, static only**. The SQL adds provider/evaluation enums and tables, adds `BenchmarkTask.evaluationStrategy` with a safe default, and relaxes NOT NULL on two existing score columns. No DROP/DELETE/TRUNCATE/rename operations. Existing HTTP-agent tables/relations are untouched. Historical rows were not inspected because PostgreSQL was unavailable.
+- PostgreSQL: **BLOCKED**. `.env` target was confirmed without exposing credentials as `127.0.0.1:5432/agentarena_test`; `.env` is ignored. Port check failed; Windows service inspection was denied. `npm run test:postgres` and `npm run prisma:migrate:deploy` could not connect. No migration was applied and no records changed. Integration test now asserts the new migration is recorded and covers connection create/delete, encrypted key behavior, ownership, two-model run, exact evaluations/leaderboard, restart retrieval, and existing HTTP-agent fixture workflows; these DB checks remain unexecuted.
+- BullMQ: **BLOCKED**. `npm run test:bullmq` refused because `AGENTARENA_TEST_REDIS_URL` is absent; hosted `REDIS_URL` was not used. Worker restart/retry/disconnect/recovery against real Redis remain NOT VERIFIED.
+- Provider mocks: **PASS**. All four adapter contracts; auth rejection, unsupported-model 404, malformed response, timeout, one bounded 429 retry, normalized usage, and secret-safe errors.
+- Separation: **PASS offline tests** for exact/deterministic checks, heuristic labeling, unverified code results, and separate optional Bifrost reviews. This is not proof of coding correctness; no code ran in a sandbox.
+- Current checks: `npm test` PASS (Stages 3–8: 66 checks plus auth/Bifrost/provider/model orchestration); `npm run prisma:validate` PASS; `npm run prisma:generate` PASS; `npm run lint` PASS; `npm run build` PASS; `git diff --check` PASS.
+- Small test changes: integration script now asserts the new migration; provider mock test now covers unsupported-model responses. No secrets, hosted services, or production data touched; no commit/push.
+
+The dedicated BullMQ integration harness now also includes duplicate job-ID behavior and recovery of a waiting run after worker restart, alongside its existing retry, queue processing, API restart, and PostgreSQL persistence checks. These scenarios are prepared, not run, because the test Redis and local PostgreSQL are unavailable.
+
+Exact next step: make local PostgreSQL 17 available on 127.0.0.1:5432 for the isolated `agentarena_test`, then run `npm run prisma:migrate:deploy` and `npm run test:postgres`. Separately provision a disposable Redis and set only `AGENTARENA_TEST_REDIS_URL` for BullMQ lifecycle tests.
+
+## Environment recheck (2026-11-21)
+
+- PostgreSQL preflight: **BLOCKED**. Sanitized check confirms configured target is local `agentarena_test`; Prisma connect failed, `Test-NetConnection` to port 5432 is false, and `npm run test:postgres` fails with P1001. Service-control query is denied by Windows permissions. Migration deployment was not run because target is unreachable; no data changed.
+- Test Redis preflight: **BLOCKED**. `AGENTARENA_TEST_REDIS_URL` is not configured. `npm run test:bullmq` exits at its safety guard before connecting and refuses to use app `REDIS_URL`.
+- Independent verification: **PASS** `npm test` (Stages 3–8 all green; auth/ownership, Bifrost, provider mocks including unsupported models, and model orchestration pass); Prisma validate/generate; `npm run lint`; `npm run build`. Provider calls are mocks only.
+- Model DB + historical HTTP data preservation: **NOT VERIFIED**; integration scenarios could not reach PostgreSQL. Real queue retries, duplicate behavior, worker restart, Redis loss/recovery, and DB persistence: **NOT VERIFIED**; BullMQ integration harness now contains duplicate-ID/restart scenarios but could not start without dedicated Redis.
+- `scripts/test-postgres-integration.mjs` and `scripts/test-bullmq-integration.mjs` syntax checks and `git diff --check`: **PASS**. No production Redis/data touched; no commit/push.
+
+Resume only after the services are truly available to this workspace: start PostgreSQL on local port 5432 with the isolated `agentarena_test`; set `AGENTARENA_TEST_REDIS_URL` to the disposable Redis (not the app Redis); rerun migration deploy, PostgreSQL integration, and BullMQ integration.
+
+## Windows-side PostgreSQL handoff (2026-11-21)
+
+Per user instruction, no further PostgreSQL connection attempt was made from the Codex environment. Reviewed `scripts/test-postgres-integration.mjs`: command is `npm run test:postgres`; prerequisites are Node/npm dependencies and `.env` with `DATABASE_URL` strictly targeting `postgres@127.0.0.1:5432/agentarena_test?schema=public`. It starts local HTTP/provider fixtures, creates unique temporary users, agents, tasks, runs, model credentials/connections/evaluations, and cleans only records belonging to those generated test users. It does not reset the database. Its API subprocess forces Redis to closed loopback port 1, so it does not use app/production Redis.
+
+Prepared `scripts/verify-postgres-windows.ps1` plus `scripts/postgres-target-check.mjs` and `scripts/postgres-history-snapshot.mjs`. Runner checks the exact target and live server identity before migration/test work; reads migration status; only permits the reviewed `20261120120000_model_benchmarking` migration, and only after explaining impact and the user types `APPLY agentarena_test`; snapshots historical HTTP data before/after migration and all existing HTTP/model data before/after tests; asks typed confirmation before integration tests. It offers no database-reset operation and stops on unexpected pending migrations or snapshot differences. Runner/parser/helper syntax checks PASS; runner has NOT BEEN executed against the user's laptop database. No migration or integration test ran in Codex. On request, fixed its missing-secret-key blocker: after successful DB connection, it now uses a configured valid key or generates a temporary process-only key for disposable fixture records; it never prints or persists that generated key and does not replace `.env`.
+
+Commands for the user on the Windows laptop, from `C:\agentarena`:
+
+```powershell
+.\scripts\verify-postgres-windows.ps1
+```
+
+If it reports the single reviewed model migration pending and the user approves the described schema changes, rerun:
+
+```powershell
+.\scripts\verify-postgres-windows.ps1 -ApplyPendingMigrations
+```
+
+The script asks for explicit typed confirmation before migration and separately before tests. If PowerShell blocks script execution, run `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-postgres-windows.ps1` (add `-ApplyPendingMigrations` only after reviewing the impact). Share the sanitized `migrate status` output and PASS/FAIL lines only; never share `.env` contents.
+
+## PostgreSQL integration run findings (user-run, 2026-11-21)
+
+User-provided Windows output confirms PostgreSQL target/connectivity **PASS**, Prisma migration status **UP TO DATE** (four migrations), and Prisma validate/generate **PASS**. The model integration run then **FAIL**ed at `scripts/test-postgres-integration.mjs:292`: the API returns model evaluation fields nested under `item.evaluation`, but the test asserted top-level `accuracyScore`, yielding `[undefined, undefined]` rather than `[0, 100]`. Fixed the assertions to inspect nested evaluation fields.
+
+Confirmed cleanup defect from test code/schema: the integration creates three remaining agents named `Audit <8-char-uuid> correct/partial/incorrect`, but cleanup searched for names starting with a different `PG integration <uuid>` marker. Agent owner FK is `ON DELETE SET NULL`, so deleting temporary users leaves those agents orphaned. Fixed cleanup to delete all Agent, BenchmarkTask, and BenchmarkRun rows owned by the two exact generated test users before deleting the users. Snapshot mismatch is explained by this code path; actual post-run row count is **inferred, not verified**. No database cleanup or rerun was performed by Codex.
+
+Status: migration **UP TO DATE**; model connection creation, key encryption/decryption, and ownership checks **PASS** in user output; model evaluation assertion **FAIL** (test contract fixed); leaderboard, HTTP-agent benchmark, restart persistence, and full historical snapshot preservation **NOT VERIFIED** because the test stopped at that assertion. Integration script syntax and `git diff --check` **PASS**.
+
+Next: inspect likely orphan test agents with a read-only query before any further test run. Do not delete unless confirmed as generated fixtures and explicitly approved. After review, rerun the guarded Windows runner; migration status is already up to date.
+
+## PowerShell 5.1 runner correction (2026-11-21)
+
+User ran the runner on Windows. PostgreSQL target/connectivity **PASS**: `agentarena_test/public`, `postgres`, local 127.0.0.1:5432. The runner then stopped because Windows PowerShell 5.1 treated Prisma's informational stderr line `Environment variables loaded from .env` as a terminating error. No migration status/result, migration application, or integration tests were completed; no data changed. Fixed runner native-command capture to tolerate informational stderr while checking each process exit code and redacting URL credentials. PowerShell parser check **PASS**. Rerun locally to get migration status; no Codex DB connection attempt was made.

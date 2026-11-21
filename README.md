@@ -141,6 +141,14 @@ npx tsx src/tests/stage8.test.ts   # Stage 8 Full Production & Security Audit
 - Optional semantic review: deterministic evaluation is the default. AI review requires a separately running Bifrost gateway, gateway access settings (`BIFROST_ENDPOINT` ending in `/v1` and `BIFROST_API_KEY`), and an upstream provider/model configured in Bifrost. Set `BIFROST_EVALUATION_PROVIDER` and provider-qualified `BIFROST_EVALUATION_MODEL` in AgentArena, then request `aiAssisted: true` on the evaluation endpoint to add a validated semantic score and provenance. AI scores do not change deterministic scores; if gateway or provider setup is missing or fails, the request returns an error and saves no partial evaluation batch.
 - Authorization secrets are kept server-side and redacted from all diagnostic endpoints.
 
+### 6. Direct Model Benchmarking
+- AgentArena can also compare Google Gemini, OpenAI, Anthropic Claude, and DeepSeek models. In **Model Connections**, validate a user-owned provider key, choose models returned by that provider's model-list endpoint, and save them. Keys are AES-256-GCM encrypted in PostgreSQL and are never returned to the browser.
+- Model and HTTP-agent runs use the same `BenchmarkTask`, `BenchmarkRun`, and BullMQ queue, with distinct execution records and separate leaderboards. A run compares one execution type at a time; it does not mix model and agent rankings.
+- Models receive a shared prompt built from the task instructions, language, and input. Provider-reported token usage and request latency are stored. Estimated cost remains unavailable because no maintained price catalog is configured.
+- Task evaluation defaults to **Code response — correctness unverified**. Code is not executed by this implementation. Use **Exact text answer** or **Exact JSON value** for deterministic, verifiable response comparison. **Text heuristic** is explicitly labeled and is excluded from ranked leaderboards. Optional Bifrost semantic review is stored separately and never overwrites deterministic scores.
+- Apply the additive model-benchmarking migration with `npm run prisma:migrate:deploy` before deploying the updated app. Keep the same production `AGENTARENA_SECRET_KEY` used to encrypt existing agent credentials; changing it makes stored keys unreadable.
+- Provider references: [Gemini generateContent](https://ai.google.dev/api/generate-content), [OpenAI Responses API](https://developers.openai.com/api/reference/resources/responses/methods/create), [Anthropic Messages API](https://platform.claude.com/docs/en/api/messages), [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/).
+
 ---
 
 ## Environment Variables Reference
@@ -160,6 +168,8 @@ npx tsx src/tests/stage8.test.ts   # Stage 8 Full Production & Security Audit
 | `BIFROST_EVALUATION_PROVIDER` | Optional | Empty | Provider for opt-in semantic review |
 | `BIFROST_EVALUATION_MODEL` | Optional | Empty | Configured, provider-qualified model, e.g. `openai/gpt-4o-mini` |
 | `ALLOW_LOCAL_TEST_AGENTS` | Optional | `false` in prod | Set to `true` only for dev localhost testing |
+
+Provider keys are supplied by each authenticated user in Model Connections. They are not application environment variables. The local provider fixture override is test-only, accepts loopback HTTP only, and is disabled in production.
 
 ---
 
@@ -193,7 +203,8 @@ The production `build` command creates the Vite frontend bundle and bundled Node
 ## Known Limitations
 
 - Authentication and owner scoping passed database-backed API tests with two users; production multi-instance rate limiting still requires shared Redis.
-- Deterministic scores currently use code-length, language-pattern, title-keyword, and expected-output substring checks; generated code is not executed, so accuracy scores are not functional correctness measurements.
+- Code task scores default to unverified; no submitted code is run. Explicit text heuristics remain diagnostic only and are excluded from leaderboards. Exact text and canonical JSON matching are currently supported; sandboxed code tests, mathematical checking, and general JSON-schema validation remain unimplemented.
+- Provider usage is recorded, but estimated token cost is unavailable because pricing/version data is not maintained.
 - The HTTP benchmark orchestrator does not use `DockerExecutor`; Docker status is an infrastructure probe, not evidence of sandboxed benchmark execution.
 - PostgreSQL passed against local PostgreSQL 17.12. This audit has not yet verified BullMQ against an isolated Redis test instance; `npm run test:bullmq` requires `AGENTARENA_TEST_REDIS_URL`. Live Bifrost connectivity is unverified.
 - Import applied to `agentarena_test`: 4 agents, 4 tasks, 1 run, 2 executions, 2 evaluations. It skipped 21 runs and 42 executions with missing parents/duplicate execution IDs; original JSON files and timestamped backups remain. Reapplying inserted zero duplicates.

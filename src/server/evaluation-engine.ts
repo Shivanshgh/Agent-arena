@@ -7,7 +7,7 @@ import {
   TestCaseResult,
 } from '../types/evaluation';
 
-export const EVALUATION_ENGINE_VERSION = '1.0.0';
+export const EVALUATION_ENGINE_VERSION = '1.1.0';
 
 export class EvaluationEngine {
   private weights: EvaluationWeights;
@@ -66,6 +66,21 @@ export class EvaluationEngine {
     }
 
     const output = (execution.rawOutput || '').trim();
+    const strategy = task.evaluationStrategy || 'HEURISTIC_TEXT';
+    if (strategy === 'CODE_UNVERIFIED' || ((strategy === 'EXACT_MATCH' || strategy === 'JSON_EXACT') && !task.expectedOutput?.trim())) {
+      return this.buildUnverifiedEvaluation(task, execution, output);
+    }
+
+    if (strategy === 'EXACT_MATCH') {
+      const passed = output === task.expectedOutput!.trim();
+      testCases.push({ name: 'Exact text answer', passed, expected: task.expectedOutput, actual: output, message: passed ? 'Output exactly matches the expected answer.' : 'Output differs from the expected answer.' });
+    } else if (strategy === 'JSON_EXACT') {
+      const canonical = (value: any): string => Array.isArray(value) ? `[${value.map(canonical).join(',')}]`
+        : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}` : JSON.stringify(value);
+      let passed = false;
+      try { passed = canonical(JSON.parse(output)) === canonical(JSON.parse(task.expectedOutput!)); } catch { /* malformed JSON fails this case */ }
+      testCases.push({ name: 'Structured JSON exact value', passed, expected: task.expectedOutput, actual: output, message: passed ? 'Parsed JSON value matches the expected value.' : 'Response is invalid JSON or does not match the expected value.' });
+    } else {
 
     // -------------------------------------------------------------
     // Test Case 1: Non-Empty Syntactically Coherent Code Output
@@ -146,6 +161,7 @@ export class EvaluationEngine {
         expected: task.expectedOutput,
       });
     }
+    }
 
     // -------------------------------------------------------------
     // Metric Calculations
@@ -186,7 +202,7 @@ export class EvaluationEngine {
       (execution.inputTokens !== null ? execution.inputTokens : 0) +
       (execution.outputTokens !== null ? execution.outputTokens : 0);
 
-    const hasTokens = execution.inputTokens !== null || execution.outputTokens !== null;
+    const hasTokens = execution.metadata?.tokenUsageSource !== 'agent-reported-unverified' && (execution.inputTokens !== null || execution.outputTokens !== null);
 
     if (hasTokens && totalTokens > 0) {
       // Benchmark token efficiency curve (2500 tokens is baseline)
@@ -253,20 +269,48 @@ export class EvaluationEngine {
       passedTestCount: passedCount,
       failedTestCount: totalCount - passedCount,
       totalTestCount: totalCount,
-      evaluationStatus: 'EVALUATED',
+      evaluationStatus: strategy === 'HEURISTIC_TEXT' ? 'HEURISTIC' : 'EVALUATED',
       evaluationVersion: EVALUATION_ENGINE_VERSION,
       breakdown: {
         accuracyDetails: `${passedCount}/${totalCount} validation test cases passed (${accuracyScore}%)`,
         completionDetails: `Execution completed successfully with structured output (${completionScore}%)`,
         reliabilityDetails: `Reliable execution without errors or crash dumps (${reliabilityScore}%)`,
         speedDetails: `Duration: ${duration}ms against ${task.timeoutSeconds}s timeout budget (${speedScore}%)`,
-        costDetails: costEfficiencyScore !== null
+        costDetails: execution.metadata?.tokenUsageSource === 'agent-reported-unverified'
+          ? 'Agent-reported token usage is unverified; cost is unavailable.'
+          : costEfficiencyScore !== null
           ? `Measured tokens: ${totalTokens} (Input: ${execution.inputTokens ?? 'null'}, Output: ${execution.outputTokens ?? 'null'}) -> ${costEfficiencyScore}%`
           : 'Token metrics not reported by agent; weights dynamically re-normalized without penalty',
         testCaseResults: testCases,
         reNormalizedWeights,
       },
       evaluatedAt: new Date().toISOString(),
+    };
+  }
+
+  private buildUnverifiedEvaluation(task: BenchmarkTask, execution: AgentExecution, output: string): ExecutionEvaluation {
+    const completed = execution.status === 'COMPLETED';
+    const duration = execution.durationMs || 0;
+    const timeoutMs = (task.timeoutSeconds || 60) * 1000;
+    const speedScore = !completed ? 0 : duration <= 100 ? 100 : duration <= 500 ? 95 : duration <= 2000 ? 90 : Math.max(10, Math.min(100, Math.round(100 * (1 - Math.min(1, duration / timeoutMs)))));
+    const tokens = (execution.inputTokens || 0) + (execution.outputTokens || 0);
+    const hasTokens = execution.inputTokens !== null || execution.outputTokens !== null;
+    const costEfficiencyScore = hasTokens && tokens > 0 ? Math.max(0, Math.min(100, Math.round(100 * (1 - Math.min(1, tokens / 2500))))) : null;
+    return {
+      id: `eval-${crypto.randomUUID()}`, runId: execution.runId, executionId: execution.id,
+      agentId: execution.agentId, agentName: execution.agentName, taskId: task.id,
+      accuracyScore: null, completionScore: completed && output.length > 0 ? 100 : 0,
+      reliabilityScore: completed ? 100 : 0, speedScore, costEfficiencyScore, overallScore: null,
+      passedTestCount: 0, failedTestCount: 0, totalTestCount: 0, evaluationStatus: 'UNVERIFIED',
+      evaluationVersion: EVALUATION_ENGINE_VERSION,
+      breakdown: {
+        accuracyDetails: 'Unavailable: returned code was not run in an isolated test environment.',
+        completionDetails: completed && output.length > 0 ? 'A non-empty response was received.' : 'No completed response was received.',
+        reliabilityDetails: completed ? 'The HTTP execution completed.' : 'The HTTP execution failed.',
+        speedDetails: `Duration: ${duration}ms against ${task.timeoutSeconds}s timeout (${speedScore}%).`,
+        costDetails: costEfficiencyScore === null ? 'Token metrics unavailable.' : `Provider-reported tokens: ${tokens}.`,
+        testCaseResults: [], reNormalizedWeights: { ...this.weights },
+      }, evaluatedAt: new Date().toISOString(),
     };
   }
 

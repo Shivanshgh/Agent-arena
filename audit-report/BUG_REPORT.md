@@ -11,3 +11,32 @@
 | B-07 | Medium | The Redis status payload reports fallback `REDIS_HOST`/`REDIS_PORT` even when a remote `REDIS_URL` is used, which can mislead diagnosis. | Not fixed in this audit; no runtime behavior impact, but status reporting should derive host/port from the active URL without exposing credentials. |
 
 No claim is made that live Render Redis configuration or queue processing is repaired. The safe local queue integration is blocked pending a separate test Redis endpoint.
+
+## E2E verification update (2026-11-20)
+
+- **B-08 | Critical |** Scoring heuristic can reward source text containing the sample expected output and penalize a general solution that computes it without embedding the literal. Partial/constant answers can tie or outrank correct general solutions. Confirmed by inspection of evaluator rules and the planned fixture assertions; full DB-backed comparison blocked because local PostgreSQL was offline. Do not describe accuracy as functional correctness.
+- Queue behavior is still not established against any Redis in this run. Dedicated test Redis missing; shared hosted Redis intentionally untouched. Render root cause remains unverified.
+- Local integration test did not reach app API because its guarded local PostgreSQL target was unavailable. No application defect is inferred from that connectivity failure.
+
+## Dual-mode benchmarking update (2026-11-20)
+
+- Code correctness defaults to `UNVERIFIED`; exact text/JSON checks are explicit, and heuristic scores are labeled and excluded from scored rankings. No sandboxed code execution was added.
+- Provider adapters pass fixture tests for supported providers, malformed responses, timeouts, bounded rate-limit retry, and secret-safe errors. No live provider was contacted.
+- The additive schema migration passes Prisma validation/generation, but deployment and data-level ownership/persistence are NOT VERIFIED because PostgreSQL at `127.0.0.1:5432` is unavailable.
+- Real BullMQ processing/recovery is NOT VERIFIED. No dedicated test Redis is configured; hosted Redis was not used.
+
+## Verification continuation
+
+- Migration audit: **PASS, static**; additive SQL only. Existing HTTP-agent data is not targeted, but actual historical-row preservation is **NOT VERIFIED** because PostgreSQL is unavailable.
+- Migration execution, model CRUD/key encryption in PostgreSQL, ownership, model run/evaluation/leaderboard persistence, and HTTP history regression: **BLOCKED** by unavailable local `agentarena_test` service.
+- Real queue retry/restart/disconnect/duplicate recovery: **BLOCKED** by absent isolated test Redis. The guard prevented access to hosted `REDIS_URL`.
+- Provider adapter unsupported-model 404 coverage added; provider fixture test suite passes. No live provider calls were made.
+
+## Environment recheck (2026-11-21)
+
+The blockers persist: `agentarena_test` is configured but PostgreSQL is unreachable (P1001); test Redis URL is absent and the BullMQ safety guard refuses app Redis. No new runtime defect was established; database and live queue behavior remain unverified. Full offline regression and provider fixtures pass.
+
+## PostgreSQL integration test defects found (2026-11-21)
+
+- Test contract bug: `/runs/:id/evaluate` returns model executions with nested `.evaluation`; test incorrectly read `accuracyScore` and `evaluationStatus` from the top level. Corrected the assertions.
+- Cleanup bug: temporary agent names did not start with the cleanup marker; owner deletion sets `ownerId` NULL, leaving likely three fixture agents. Corrected cleanup to delete rows by the two unique generated test-user IDs. These fixes have syntax checks only; no DB rerun yet.

@@ -5,7 +5,7 @@ import { benchmarkDb } from './benchmark-db';
 import { evaluationDb } from './evaluation-db';
 import { encryptSecret, decryptSecret } from './crypto';
 import { Agent, ConnectionTestResult, RegisterAgentInput, UpdateAgentInput } from '../types/agent';
-import { AgentExecution, BenchmarkRun, BenchmarkTask, CreateTaskInput, RunStatus, UpdateTaskInput } from '../types/benchmark';
+import { AgentExecution, BenchmarkRun, BenchmarkTask, CreateTaskInput, ModelBenchmarkExecution, RunStatus, UpdateTaskInput } from '../types/benchmark';
 import { ExecutionEvaluation } from '../types/evaluation';
 import type { AuthUser } from './auth';
 import { agentScope, runScope, taskReadScope, taskWriteScope } from './ownership';
@@ -44,7 +44,7 @@ function mapTask(row: any): BenchmarkTask {
   return {
     id: row.id, title: row.title, description: row.description, language: row.language,
     category: row.category, difficulty: row.difficulty, inputData: asObject(row.inputData),
-    expectedOutput: row.expectedOutput ?? undefined, timeoutSeconds: row.timeoutSeconds,
+    expectedOutput: row.expectedOutput ?? undefined, evaluationStrategy: row.evaluationStrategy || 'CODE_UNVERIFIED', timeoutSeconds: row.timeoutSeconds,
     maxOutputSizeBytes: row.maxOutputSizeBytes, isActive: row.isActive,
     createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
   };
@@ -60,18 +60,31 @@ function mapRun(row: any): BenchmarkRun {
     files: e.files && typeof e.files === 'object' ? e.files as Record<string, string> : undefined,
     metadata: asObject(e.metadata),
   }));
+  const modelExecutions: ModelBenchmarkExecution[] = (row.modelExecutions || []).map((e: any) => ({
+    id: e.id, runId: e.runId, connectionId: e.connectionId, provider: e.provider, modelId: e.modelId,
+    requestId: e.requestId, status: e.status, startedAt: e.startedAt.toISOString(),
+    completedAt: e.completedAt?.toISOString() || null, durationMs: e.durationMs ?? null,
+    inputTokens: e.inputTokens ?? null, outputTokens: e.outputTokens ?? null,
+    errorMessage: e.errorMessage ?? null, rawOutput: e.rawOutput ?? null,
+    evaluation: e.evaluation ? {
+      accuracyScore: e.evaluation.accuracyScore, completionScore: e.evaluation.completionScore,
+      reliabilityScore: e.evaluation.reliabilityScore, speedScore: e.evaluation.speedScore,
+      costEfficiencyScore: e.evaluation.costEfficiencyScore, overallScore: e.evaluation.overallScore,
+      evaluationStatus: e.evaluation.evaluationStatus, breakdown: asObject(e.evaluation.breakdown),
+    } : null,
+  }));
   return {
     id: row.id, title: row.title, taskId: row.taskId, taskTitle: row.task?.title || row.taskId,
     taskLanguage: row.task?.language || '', taskDescription: row.task?.description || '',
     taskDifficulty: row.task?.difficulty || 'MEDIUM', agentIds: executions.map((e) => e.agentId),
     status: row.status, startedAt: row.startedAt.toISOString(), completedAt: row.completedAt?.toISOString() || null,
-    durationMs: row.durationMs ?? null, executions, createdAt: row.startedAt.toISOString(),
+    durationMs: row.durationMs ?? null, executions, modelExecutions, createdAt: row.startedAt.toISOString(),
   };
 }
 
 async function runById(id: string, tx: Prisma.TransactionClient | typeof prisma = prisma, actor?: AuthUser): Promise<BenchmarkRun | null> {
   const row = await tx.benchmarkRun.findFirst({
-    where: { id, ...runScope(actor) }, include: { task: true, executions: { include: { agent: true }, orderBy: { startedAt: 'asc' } } },
+    where: { id, ...runScope(actor) }, include: { task: true, executions: { include: { agent: true }, orderBy: { startedAt: 'asc' } }, modelExecutions: { include: { evaluation: true }, orderBy: { startedAt: 'asc' } } },
   });
   return row ? mapRun(row) : null;
 }
@@ -181,6 +194,7 @@ export const runtimeDb = {
     return mapTask(await prisma.benchmarkTask.create({ data: {
       ownerId: actor?.id, isShared: false, title: input.title, description: input.description, language: input.language, category: input.category || 'Algorithms',
       difficulty: input.difficulty || 'MEDIUM', inputData: asJson(input.inputData), expectedOutput: input.expectedOutput,
+      evaluationStrategy: input.evaluationStrategy || 'CODE_UNVERIFIED',
       timeoutSeconds: input.timeoutSeconds || 60, maxOutputSizeBytes: input.maxOutputSizeBytes || 100000,
       isActive: input.isActive ?? true,
     } }));
@@ -198,7 +212,7 @@ export const runtimeDb = {
   },
   async listRuns(actor?: AuthUser): Promise<BenchmarkRun[]> {
     if (useJsonFixture) return benchmarkDb.listRuns();
-    const rows = await prisma.benchmarkRun.findMany({ where: runScope(actor), orderBy: { startedAt: 'desc' }, include: { task: true, executions: { include: { agent: true } } } });
+    const rows = await prisma.benchmarkRun.findMany({ where: runScope(actor), orderBy: { startedAt: 'desc' }, include: { task: true, executions: { include: { agent: true } }, modelExecutions: { include: { evaluation: true } } } });
     return rows.map(mapRun);
   },
   async getRun(id: string, actor?: AuthUser): Promise<BenchmarkRun | null> {
@@ -217,6 +231,12 @@ export const runtimeDb = {
           inputTokens: e.inputTokens, outputTokens: e.outputTokens, errorMessage: e.errorMessage,
           rawOutput: e.rawOutput, files: e.files ? asJson(e.files) : undefined, metadata: asJson(e.metadata),
         })) },
+        modelExecutions: run.modelExecutions?.length ? { create: run.modelExecutions.map(e => ({
+          id: e.id, connectionId: e.connectionId, provider: e.provider, modelId: e.modelId,
+          requestId: e.requestId, status: e.status, startedAt: new Date(e.startedAt),
+          completedAt: asDate(e.completedAt), durationMs: e.durationMs, inputTokens: e.inputTokens,
+          outputTokens: e.outputTokens, errorMessage: e.errorMessage, rawOutput: e.rawOutput,
+        })) } : undefined,
       } });
     });
     return (await runById(run.id))!;
@@ -254,10 +274,25 @@ export const runtimeDb = {
       return runById(runId, tx);
     });
   },
+  async updateModelExecution(runId: string, executionId: string, updates: Partial<ModelBenchmarkExecution>): Promise<BenchmarkRun | null> {
+    if (useJsonFixture) return null;
+    const found = await prisma.modelExecution.findFirst({ where: { id: executionId, runId }, select: { id: true } });
+    if (!found) return null;
+    await prisma.modelExecution.update({ where: { id: executionId }, data: {
+      status: updates.status, startedAt: updates.startedAt ? new Date(updates.startedAt) : undefined,
+      completedAt: asDateUpdate(updates.completedAt), durationMs: updates.durationMs,
+      inputTokens: updates.inputTokens, outputTokens: updates.outputTokens,
+      errorMessage: updates.errorMessage, rawOutput: updates.rawOutput,
+    } });
+    return this.refreshRunStatus(runId);
+  },
   async refreshRunStatus(runId: string): Promise<BenchmarkRun | null> {
     if (useJsonFixture) return benchmarkDb.getRun(runId);
     return prisma.$transaction(async (tx) => {
-      const rows = await tx.agentExecution.findMany({ where: { runId }, select: { status: true } });
+      const rows = [
+        ...await tx.agentExecution.findMany({ where: { runId }, select: { status: true } }),
+        ...await tx.modelExecution.findMany({ where: { runId }, select: { status: true } }),
+      ];
       const terminal = rows.length > 0 && rows.every((e) => ['COMPLETED', 'FAILED', 'TIMED_OUT'].includes(e.status));
       const completed = rows.filter((e) => e.status === 'COMPLETED').length;
       const run = await tx.benchmarkRun.findUnique({ where: { id: runId }, select: { startedAt: true } });
@@ -285,7 +320,7 @@ export const runtimeDb = {
     }
     const [agentRows, runRows, taskRows] = await Promise.all([
       prisma.agent.findMany({ where: agentScope(actor) }),
-      prisma.benchmarkRun.findMany({ where: runScope(actor), include: { task: true, executions: { include: { agent: true } } } }),
+      prisma.benchmarkRun.findMany({ where: runScope(actor), include: { task: true, executions: { include: { agent: true } }, modelExecutions: { include: { evaluation: true } } } }),
       prisma.benchmarkTask.findMany({ where: taskReadScope(actor) }),
     ]);
     const runIds = runRows.map((r) => r.id);

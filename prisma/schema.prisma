@@ -30,22 +30,31 @@ enum AuthType {
   CUSTOM_HEADER
 }
 
+enum ModelProvider {
+  GEMINI
+  OPENAI
+  ANTHROPIC
+  DEEPSEEK
+}
+
 enum UserRole {
   USER
   ADMIN
 }
 
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  passwordHash String
-  role         UserRole      @default(USER)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  sessions     AuthSession[]
-  agents       Agent[]
-  tasks        BenchmarkTask[]
-  runs         BenchmarkRun[]
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  passwordHash        String
+  role                UserRole             @default(USER)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  sessions            AuthSession[]
+  agents              Agent[]
+  tasks               BenchmarkTask[]
+  runs                BenchmarkRun[]
+  providerCredentials ProviderCredential[]
+  modelConnections    ModelConnection[]
 
   @@index([role])
 }
@@ -63,37 +72,37 @@ model AuthSession {
 }
 
 model Agent {
-  id                      String           @id @default(uuid())
-  ownerId                 String?
-  owner                   User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  name                    String
-  description             String?
-  version                 String           @default("1.0.0")
-  integrationType         IntegrationType  @default(HTTP)
-  endpoint                String
-  supportedLanguages      String[]         @default([])
-  supportedCapabilities   String[]         @default([])
-  
-  // Encrypted authentication credentials (never exposed via API)
-  authType                AuthType         @default(NONE)
-  authHeaderName          String?          // e.g. "Authorization" or "X-API-Key"
-  encryptedAuthSecret     String?          // AES-256-GCM encrypted payload
-  authSecretIv            String?          // Initialization vector
-  authSecretTag           String?          // Auth tag for GCM integrity
-  
-  connectionStatus        ConnectionStatus @default(UNTESTED)
-  lastSuccessfulConnection DateTime?
-  lastCheckedAt           DateTime?
-  lastErrorMessage        String?
-  
-  metadata                Json?            @default("{}")
-  createdAt               DateTime         @default(now())
-  updatedAt               DateTime         @updatedAt
+  id                    String          @id @default(uuid())
+  ownerId               String?
+  owner                 User?           @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  name                  String
+  description           String?
+  version               String          @default("1.0.0")
+  integrationType       IntegrationType @default(HTTP)
+  endpoint              String
+  supportedLanguages    String[]        @default([])
+  supportedCapabilities String[]        @default([])
 
-  connectionLogs          ConnectionLog[]
-  tasks                   AgentTask[]
-  executions              AgentExecution[]
-  evaluations             ExecutionEvaluation[]
+  // Encrypted authentication credentials (never exposed via API)
+  authType            AuthType @default(NONE)
+  authHeaderName      String? // e.g. "Authorization" or "X-API-Key"
+  encryptedAuthSecret String? // AES-256-GCM encrypted payload
+  authSecretIv        String? // Initialization vector
+  authSecretTag       String? // Auth tag for GCM integrity
+
+  connectionStatus         ConnectionStatus @default(UNTESTED)
+  lastSuccessfulConnection DateTime?
+  lastCheckedAt            DateTime?
+  lastErrorMessage         String?
+
+  metadata  Json?    @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  connectionLogs ConnectionLog[]
+  tasks          AgentTask[]
+  executions     AgentExecution[]
+  evaluations    ExecutionEvaluation[]
 
   @@index([connectionStatus])
   @@index([name])
@@ -104,6 +113,13 @@ enum TaskDifficulty {
   EASY
   MEDIUM
   HARD
+}
+
+enum EvaluationStrategy {
+  CODE_UNVERIFIED
+  EXACT_MATCH
+  JSON_EXACT
+  HEURISTIC_TEXT
 }
 
 enum RunStatus {
@@ -123,25 +139,26 @@ enum ExecutionStatus {
 }
 
 model BenchmarkTask {
-  id                 String         @id @default(uuid())
+  id                 String             @id @default(uuid())
   ownerId            String?
-  owner              User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  isShared           Boolean        @default(false)
+  owner              User?              @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  isShared           Boolean            @default(false)
   title              String
   description        String
   language           String
-  category           String         @default("Algorithms")
-  difficulty         TaskDifficulty @default(MEDIUM)
-  inputData          Json           @default("{}")
+  category           String             @default("Algorithms")
+  difficulty         TaskDifficulty     @default(MEDIUM)
+  inputData          Json               @default("{}")
   expectedOutput     String?
-  timeoutSeconds     Int            @default(60)
-  maxOutputSizeBytes Int            @default(100000)
-  isActive           Boolean        @default(true)
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  evaluationStrategy EvaluationStrategy @default(CODE_UNVERIFIED)
+  timeoutSeconds     Int                @default(60)
+  maxOutputSizeBytes Int                @default(100000)
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
-  runs               BenchmarkRun[]
-  evaluations        ExecutionEvaluation[]
+  runs        BenchmarkRun[]
+  evaluations ExecutionEvaluation[]
 
   @@index([language])
   @@index([difficulty])
@@ -149,43 +166,122 @@ model BenchmarkTask {
 }
 
 model BenchmarkRun {
-  id           String           @id @default(uuid())
-  ownerId      String?
-  owner        User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  title        String
-  taskId       String
-  task         BenchmarkTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  status       RunStatus        @default(QUEUED)
-  startedAt    DateTime         @default(now())
-  completedAt  DateTime?
-  durationMs   Int?
-  
-  executions   AgentExecution[]
-  evaluations  ExecutionEvaluation[]
+  id          String        @id @default(uuid())
+  ownerId     String?
+  owner       User?         @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  title       String
+  taskId      String
+  task        BenchmarkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  status      RunStatus     @default(QUEUED)
+  startedAt   DateTime      @default(now())
+  completedAt DateTime?
+  durationMs  Int?
+
+  executions       AgentExecution[]
+  evaluations      ExecutionEvaluation[]
+  modelExecutions  ModelExecution[]
+  modelEvaluations ModelEvaluation[]
 
   @@index([taskId, status])
   @@index([ownerId, startedAt])
 }
 
-model AgentExecution {
-  id              String          @id @default(uuid())
-  runId           String
-  run             BenchmarkRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
-  agentId         String
-  agent           Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  requestId       String
-  status          ExecutionStatus @default(QUEUED)
-  startedAt       DateTime        @default(now())
-  completedAt     DateTime?
-  durationMs      Int?
-  inputTokens     Int?
-  outputTokens    Int?
-  errorMessage    String?
-  rawOutput       String?
-  files           Json?
-  metadata        Json?           @default("{}")
+model ProviderCredential {
+  id              String            @id @default(uuid())
+  ownerId         String
+  owner           User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  provider        ModelProvider
+  encryptedApiKey String
+  apiKeyIv        String
+  apiKeyTag       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  connections     ModelConnection[]
 
-  evaluations     ExecutionEvaluation[]
+  @@unique([ownerId, provider])
+  @@index([ownerId])
+}
+
+model ModelConnection {
+  id           String             @id @default(uuid())
+  ownerId      String
+  owner        User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  credentialId String
+  credential   ProviderCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  provider     ModelProvider
+  modelId      String
+  displayName  String
+  createdAt    DateTime           @default(now())
+  executions   ModelExecution[]
+
+  @@unique([ownerId, provider, modelId])
+  @@index([ownerId, provider])
+}
+
+model ModelExecution {
+  id           String           @id @default(uuid())
+  runId        String
+  run          BenchmarkRun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  connectionId String?
+  connection   ModelConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  provider     ModelProvider
+  modelId      String
+  requestId    String           @unique
+  status       ExecutionStatus  @default(QUEUED)
+  startedAt    DateTime         @default(now())
+  completedAt  DateTime?
+  durationMs   Int?
+  inputTokens  Int?
+  outputTokens Int?
+  errorMessage String?
+  rawOutput    String?
+  metadata     Json             @default("{}")
+  evaluation   ModelEvaluation?
+
+  @@index([runId, status])
+  @@index([connectionId])
+  @@index([provider, modelId])
+}
+
+model ModelEvaluation {
+  id                  String         @id @default(uuid())
+  runId               String
+  run                 BenchmarkRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  modelExecutionId    String         @unique
+  modelExecution      ModelExecution @relation(fields: [modelExecutionId], references: [id], onDelete: Cascade)
+  accuracyScore       Float?
+  completionScore     Float
+  reliabilityScore    Float
+  speedScore          Float
+  costEfficiencyScore Float?
+  overallScore        Float?
+  evaluationStatus    String         @default("UNVERIFIED")
+  evaluationVersion   String         @default("1.1.0")
+  breakdown           Json           @default("{}")
+  createdAt           DateTime       @default(now())
+
+  @@index([runId])
+}
+
+model AgentExecution {
+  id           String          @id @default(uuid())
+  runId        String
+  run          BenchmarkRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  agentId      String
+  agent        Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  requestId    String
+  status       ExecutionStatus @default(QUEUED)
+  startedAt    DateTime        @default(now())
+  completedAt  DateTime?
+  durationMs   Int?
+  inputTokens  Int?
+  outputTokens Int?
+  errorMessage String?
+  rawOutput    String?
+  files        Json?
+  metadata     Json?           @default("{}")
+
+  evaluations ExecutionEvaluation[]
 
   @@unique([runId, agentId])
   @@unique([requestId])
@@ -194,65 +290,65 @@ model AgentExecution {
 }
 
 model ExecutionEvaluation {
-  id                   String          @id @default(uuid())
-  runId                String
-  run                  BenchmarkRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
-  executionId          String
-  execution            AgentExecution  @relation(fields: [executionId], references: [id], onDelete: Cascade)
-  agentId              String
-  agent                Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  taskId               String
-  task                 BenchmarkTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  accuracyScore        Float           @default(0)
-  completionScore      Float           @default(0)
-  reliabilityScore     Float           @default(0)
-  speedScore           Float           @default(0)
-  costEfficiencyScore  Float?
-  overallScore         Float           @default(0)
-  passedTestCount      Int             @default(0)
-  failedTestCount      Int             @default(0)
-  totalTestCount       Int             @default(0)
-  evaluationStatus     String          @default("EVALUATED")
-  evaluationVersion    String          @default("1.0.0")
-  breakdown            Json            @default("{}")
-  createdAt            DateTime        @default(now())
+  id                  String         @id @default(uuid())
+  runId               String
+  run                 BenchmarkRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  executionId         String
+  execution           AgentExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  agentId             String
+  agent               Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  taskId              String
+  task                BenchmarkTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  accuracyScore       Float?
+  completionScore     Float          @default(0)
+  reliabilityScore    Float          @default(0)
+  speedScore          Float          @default(0)
+  costEfficiencyScore Float?
+  overallScore        Float?
+  passedTestCount     Int            @default(0)
+  failedTestCount     Int            @default(0)
+  totalTestCount      Int            @default(0)
+  evaluationStatus    String         @default("EVALUATED")
+  evaluationVersion   String         @default("1.0.0")
+  breakdown           Json           @default("{}")
+  createdAt           DateTime       @default(now())
 
+  @@unique([executionId])
   @@index([runId])
   @@index([taskId])
-  @@unique([executionId])
   @@index([executionId])
   @@index([agentId])
 }
 
 model ConnectionLog {
-  id             String    @id @default(uuid())
-  agentId        String
-  agent          Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  testedAt       DateTime  @default(now())
-  success        Boolean
-  statusCode     Int?
-  latencyMs      Float?
-  resolvedIp     String?
-  errorMessage   String?
-  responseBody   Json?
+  id           String   @id @default(uuid())
+  agentId      String
+  agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  testedAt     DateTime @default(now())
+  success      Boolean
+  statusCode   Int?
+  latencyMs    Float?
+  resolvedIp   String?
+  errorMessage String?
+  responseBody Json?
 
   @@index([agentId, testedAt])
 }
 
 model AgentTask {
-  id             String    @id @default(uuid())
-  agentId        String
-  agent          Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
+  agentId         String
+  agent           Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
   protocolVersion String   @default("1.0")
-  taskTitle      String
-  taskLanguage   String
-  status         String    // queued, running, completed, failed, timed_out
-  durationMs     Int?
-  inputTokens    Int?
-  outputTokens   Int?
-  error          String?
+  taskTitle       String
+  taskLanguage    String
+  status          String // queued, running, completed, failed, timed_out
+  durationMs      Int?
+  inputTokens     Int?
+  outputTokens    Int?
+  error           String?
   responseContent String?
-  createdAt      DateTime  @default(now())
+  createdAt       DateTime @default(now())
 
   @@index([agentId, createdAt])
 }
