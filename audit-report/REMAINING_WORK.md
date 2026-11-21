@@ -1,5 +1,24 @@
 # Remaining Work (Prioritized)
 
+## Phase 8 security follow-up
+
+1. **Medium — distributed rate limits:** current global/auth maps remain process-local. Costly routes now also enforce a 10/min limit, keyed by account after authentication. Before multiple Render instances or sustained public use, add a shared Redis-backed limiter after testing it with a disposable Redis and deciding failure policy. The queue's production Redis was not used for tests. `REDIS_URL` could technically host separately prefixed atomic counter/TTL keys, but its Upstash behavior, capacity impact, and outage interaction with BullMQ have not been verified; a distinct logical database/instance is safer.
+2. **Low — deployment check:** confirm `NODE_ENV=production` on Render. Production CSP is configured; HSTS is sent only for HTTPS requests. Verify forwarded protocol behavior on the deployed service.
+3. **Low — endpoint hygiene:** avoid secret-bearing URL query parameters; dedicated encrypted agent auth fields are provided. AI semantic review is still probabilistic and must remain advisory.
+4. Re-run a dependency advisory scanner when npm registry access is available. Current `npm audit` was blocked by DNS; no dependency vulnerability conclusion is available.
+5. Follow up the user-run PostgreSQL failure: run a read-only query for the generated ownerless `Audit acc6b530 ...` agents before any further test. Do not delete these or any other database rows without the user's explicit approval.
+
+Exact safe read-only query on the user's Windows PostgreSQL session (confirm connected to `agentarena_test` first):
+
+```sql
+SELECT "id", "name", "ownerId", "createdAt"
+FROM "Agent"
+WHERE "ownerId" IS NULL AND "name" LIKE 'Audit acc6b530 %'
+ORDER BY "createdAt" DESC;
+```
+
+Do not share credentials or delete results automatically.
+
 ## P0 — Restore a real benchmark run on Render
 
 1. Deploy the local queue fix to the main AgentArena Web Service. In Render, confirm `REDIS_URL` points to the intended Upstash instance, starts with `rediss://`, and its credential is current. Do not share the value.
@@ -64,6 +83,14 @@
 ## Recheck 2026-11-21
 
 The services are still unavailable from this workspace: local test PostgreSQL connect returns P1001 and no dedicated Redis URL is configured. Once available here, run `npm run prisma:migrate:deploy`, `npm run test:postgres`, and `npm run test:bullmq`; these are not complete yet. Do not substitute app `REDIS_URL`.
+
+## Final pre-submission status — 2026-11-21
+
+1. PostgreSQL integration: user reports `agentarena_test` is running and lists six audit agents plus two successful connection logs. Preserve them. The Codex environment cannot reach the user's Windows localhost; do not retry connectivity here. The previous guarded integration run stopped at the evaluation assertion; rerun the corrected runner locally only after reviewing its prompts and ensuring it will preserve these existing rows.
+2. Redis/BullMQ: provide a dedicated disposable test Redis URL as `AGENTARENA_TEST_REDIS_URL`, not the production/app Redis, then run `npm run test:bullmq`.
+3. Render: use the web/worker settings in README; verify with the owner's dashboard and one real benchmark after deployment. No live Render evidence exists in this workspace.
+4. UI: no browser-test framework is configured; manually verify mobile/desktop drawer, keyboard focus/Escape, backdrop close, all nine sections, account menu, and both CTAs before publishing.
+5. Scoring: correctness remains unverified unless tasks use exact checks or a future isolated sandbox. Heuristic and AI-assisted judgments are not proof of code correctness.
 
 ## Local Windows database verification handoff
 

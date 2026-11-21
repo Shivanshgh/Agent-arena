@@ -122,3 +122,84 @@ Next: inspect likely orphan test agents with a read-only query before any furthe
 ## PowerShell 5.1 runner correction (2026-11-21)
 
 User ran the runner on Windows. PostgreSQL target/connectivity **PASS**: `agentarena_test/public`, `postgres`, local 127.0.0.1:5432. The runner then stopped because Windows PowerShell 5.1 treated Prisma's informational stderr line `Environment variables loaded from .env` as a terminating error. No migration status/result, migration application, or integration tests were completed; no data changed. Fixed runner native-command capture to tolerate informational stderr while checking each process exit code and redacting URL credentials. PowerShell parser check **PASS**. Rerun locally to get migration status; no Codex DB connection attempt was made.
+
+## Phase 8 security audit — 2026-11-21 (latest checkpoint)
+
+### Completed
+
+- Reviewed authentication/session/authorization, route ownership scopes, agent endpoint SSRF and HTTP adapter, provider adapters and encrypted credentials, Bifrost semantic review, queue logging/config, Prisma access patterns/schema, Docker executor, React rendering, CORS/CSRF, rate limits, input bounds, error/log handling and production headers.
+- Found/fixed: production local-agent override bypass; unbounded health/execution response buffering; execution/health timeout cleared before body consumption. Added 64 KiB health and configured execution byte caps, kept timeout active through reads, blocked shared/documentation/benchmark IPv4 ranges, and rejected endpoint URL userinfo.
+- Added focused regression cases in `src/tests/stage3.test.ts` and `src/tests/stage8.test.ts`.
+- Full `npm test`: **PASS**, exit 0. Stage 3 17/17; Stage 4 8/8; Stage 5 9/9; Stage 6 6/6; Stage 7 9/9; Stage 8 22/22; Stage 9 auth/ownership, Stage 10 Bifrost, provider mocks and model orchestration all pass. Used a process-only test key and local mock fixture permission. Queue fixture emitted expected connection-refused diagnostics; no hosted Redis used.
+- `npm run prisma:validate`, `npm run lint`, `npm run build`, `git diff --check`: **PASS**. Existing Vite native config-loader warning is non-blocking.
+- Secret-pattern scan found only placeholder connection strings in `.env.example`, README and local setup script; `.env` is ignored and untracked. Git-history scan had only those same placeholder files. No dedicated secret scanner installed.
+
+### Findings / blockers
+
+- **Medium, unresolved:** DNS rebinding window remains: DNS is checked in `src/server/ssrf.ts`, then `fetch` independently resolves the hostname in `src/server/http-adapter.ts`. No live exploit attempt. Fix requires socket IP pinning with TLS identity preserved or hosting egress policy.
+- **Medium, unresolved:** rate limits are per-process memory keyed by socket remote address; reverse proxy sharing and multiple replicas can cause inaccurate or bypassable limits.
+- **Low:** provider HTTP JSON response body lacks a byte cap; deployment must explicitly set `NODE_ENV=production`; explicit CSP/HSTS are absent; semantic-review prompt injection could affect advisory AI review only; endpoint query strings can still carry user-provided secret data. No unsafe HTML insertion or application-route raw SQL was found. Owner scoping and encrypted credential views were confirmed by code review and existing tests.
+- `npm audit --omit=dev`: **NOT VERIFIED**; registry DNS lookup `ENOTFOUND`. No advisory data obtained.
+- PostgreSQL (user run): connection to `agentarena_test`, four migrations up to date, validation/generation, auth/session, encrypted key, ownership, agent/task CRUD **PASS**. Evaluation assertion **FAIL** at `scripts/test-postgres-integration.mjs:292`; fixed assertion to read nested `.evaluation`. Test cleanup bug fixed to target all records for its unique test-user IDs. Do not rerun or clean the DB until the suspected ownerless `Audit acc6b530 ...` records are reviewed read-only. Their actual count is still unknown. Model leaderboard/persistence/history snapshot remain **NOT VERIFIED**.
+- Dedicated BullMQ Redis, Render, live providers/Bifrost remain **NOT VERIFIED**. No production DB/Redis or external provider used.
+
+### Files changed this phase
+
+- Code/tests: `src/server/ssrf.ts`, `src/server/http-adapter.ts`, `src/tests/stage3.test.ts`, `src/tests/stage8.test.ts`.
+- Reports: `audit-report/BUG_REPORT.md`, `TEST_RESULTS.md`, `PRODUCT_READINESS.md`, `REMAINING_WORK.md`, and this file.
+- Earlier in this session the PostgreSQL test assertion and unique-owner cleanup were also corrected in `scripts/test-postgres-integration.mjs`.
+- No commit or push.
+
+### Exact next steps
+
+1. On the user's already-connected PostgreSQL console, run the read-only exact query in `audit-report/REMAINING_WORK.md` for ownerless generated `Audit acc6b530` records. Share only those returned rows; do not delete them yet.
+2. Re-run `scripts/verify-postgres-windows.ps1` only after confirming expected fixtures and migration status; it will ask before creating/cleaning its uniquely owned temporary test rows. Confirm updated evaluation, HTTP workflow, leaderboard, persistence and unchanged historical snapshot.
+3. Run `npm audit --omit=dev` when registry DNS/network works.
+4. Provision disposable `AGENTARENA_TEST_REDIS_URL`; run `npm run test:bullmq`. Never use hosted app Redis.
+5. Resolve SSRF pinning/egress and distributed production rate limiting before claiming a hardened multi-user deployment. Verify Render environment/logs only with user-controlled dashboard access; do not claim live status from local checks.
+
+## Priority security fixes — 2026-11-21 (latest)
+
+### Implemented
+
+- `src/server/pinned-http.ts` connects to the SSRF-validated numeric IP without another DNS lookup, checks the socket peer address, preserves HTTP/HTTPS, passes the original DNS name as TLS SNI for certificate validation, and rejects redirects. `src/server/ssrf.ts` strips IPv6 URL brackets and blocks non-global IPv6 ranges with `net.BlockList`.
+- Shared `src/server/limited-response.ts` caps HTTP-agent health (64 KiB), task responses (configured cap), and model-provider/Bifrost responses (2 MiB). Oversized bodies are cancelled; provider error bodies are not read. Timeouts remain active while reading.
+- Authenticated costly endpoints (agent test/execute, direct endpoint test, run launch/evaluation, existing model test routes) receive the 10/min limiter. It keys authenticated traffic by account ID and unauthenticated login/register traffic by source address.
+- Production CSP added. HSTS is set only when Express reports HTTPS or the forwarded protocol is HTTPS. Dev mode does not receive these production policies.
+- Bifrost gets a separate system policy message; task and candidate data are JSON user content. Schema bounds and separate deterministic scoring remain.
+- Tests: DNS rebind fixture verifies one resolver call and pinned socket; oversized provider/Bifrost body cases; prompt-injection separation; per-account limit; CSP/HSTS conditions.
+
+### Verification
+
+- `npm test`: **PASS**, exit 0. Latest counts: Stage 3 19/19; Stage 4 8/8; Stage 5 9/9; Stage 6 6/6; Stage 7 9/9; Stage 8 23/23; Stage 9 auth/ownership/headers; Stage 10 Bifrost, four provider fixtures and model orchestration.
+- `npm run lint`, `npm run prisma:validate`, `npm run build`, `git diff --check`: **PASS**. Existing Vite config-loader warning only.
+- PostgreSQL/BullMQ integration intentionally **NOT RUN**. No production Redis, live providers, Render, or database accessed.
+
+### Remaining security risks
+
+- **Medium:** Rate limiting is still process-local; local account/IP caps are not shared between Render replicas. Use a shared limiter only after testing a disposable Redis and establishing outage behavior. Existing queue Redis can be separately namespaced but creates shared capacity/outage coupling; no Redis-backed limiter was added.
+- **Low:** Confirm `NODE_ENV=production` and forwarded HTTPS behavior on Render. AI prompt injection remains probabilistic despite system/user separation; AI scores remain advisory. Agent endpoint query parameters can still contain owner-visible secrets. Dependency audit remains unavailable due npm registry DNS.
+- Keep all previous database caveats: user-run integration stopped at the old score assertion; code assertion/cleanup is corrected but not rerun. Read-only inspect the suspected `Audit acc6b530` orphan agents before the guarded PostgreSQL rerun; do not delete automatically.
+
+### Next safe step
+
+Run the read-only query documented in `audit-report/REMAINING_WORK.md` against `agentarena_test`; inspect the returned test-agent rows and confirm no unrelated rows before rerunning `scripts/verify-postgres-windows.ps1`. Do not perform cleanup or migrations beyond the runner's explicit prompts. No commit/push.
+
+## Final pre-submission UI/deployment pass — 2026-11-21
+
+### Completed
+- Replaced the horizontally scrolling header tabs with a left-side navigation drawer containing all nine existing sections, counts/status indicators, active state, close-on-select/backdrop/Escape, dialog semantics and keyboard focus trapping.
+- Kept AgentArena branding, Launch Battle and New Task actions visible; moved email/sign-out into a compact account disclosure for small screens.
+- Updated README Render settings: web build/start, separate worker command, shared required environment, manual migrations, frontend served by Express, and truthful current verification limitations. `.gitignore` already excludes `.env*` while preserving `.env.example`; no change needed.
+
+### Verification
+- `npm test`: PASS (exit 0) with loopback access permitted. The initial restricted run had Stage 3–4 fixture failures from `EACCES` to local sockets; this was environmental. BullMQ unit/offline checks logged expected Redis localhost refusal; no live Redis processing was tested.
+- `npm run lint`: PASS. `npm run prisma:validate`: PASS. `npm run build`: PASS (existing non-blocking Vite config-loader warning). `git diff --check`: PASS (only Git line-ending notices remain).
+- No browser UI automation is configured. No PostgreSQL connection, migration, Redis, live provider, or Render deployment was performed. User-reported test DB fixtures remain untouched. No commit/push.
+
+### Exact next steps
+1. Run `git diff --check` and review the UI/README diff.
+2. Manually verify the drawer at phone and desktop widths.
+3. On the user's Windows laptop, rerun the guarded PostgreSQL verification script only after reviewing its confirmation prompts; preserve all existing audit fixtures.
+4. Run `npm run test:bullmq` only with a separate disposable `AGENTARENA_TEST_REDIS_URL`.
+5. Verify Render web/worker environment and real queue processing from the owner's dashboard. Do not describe local tests as live deployment verification.

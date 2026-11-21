@@ -7,6 +7,8 @@ import {
   StandardizedAgentResponseSchema,
 } from '../types/agent';
 import { validateEndpointForSsrf } from './ssrf';
+import { requestPinned } from './pinned-http';
+import { readLimitedResponse } from './limited-response';
 
 export interface HttpAdapterAuth {
   type: 'NONE' | 'BEARER' | 'API_KEY' | 'CUSTOM_HEADER';
@@ -38,6 +40,8 @@ export interface AdapterExecutionResult {
   errorMessage?: string;
 }
 
+const HEALTH_RESPONSE_LIMIT_BYTES = 64 * 1024;
+
 export class AgentHttpAdapter {
   private endpoint: string;
   private auth: HttpAdapterAuth;
@@ -55,7 +59,7 @@ export class AgentHttpAdapter {
     this.auth = auth;
     this.defaultTimeoutMs = options.timeoutMs ?? 30_000;
     this.maxResponseSizeBytes = options.maxResponseSizeBytes ?? 1_000_000; // 1MB default
-    this.allowLocal = options.allowLocal ?? (process.env.ALLOW_LOCAL_TEST_AGENTS === 'true' || process.env.NODE_ENV !== 'production');
+    this.allowLocal = process.env.NODE_ENV !== 'production' && (options.allowLocal ?? (process.env.ALLOW_LOCAL_TEST_AGENTS === 'true' || process.env.NODE_ENV !== 'production'));
   }
 
   /**
@@ -127,18 +131,17 @@ export class AgentHttpAdapter {
     const timer = setTimeout(() => controller.abort(), 10_000); // 10s health check timeout
 
     try {
-      const response = await fetch(healthUrl, {
+      const response = await requestPinned(healthUrl, ssrf.resolvedIp!, {
         method: 'GET',
         headers: this.buildHeaders(),
         signal: controller.signal,
-        redirect: 'error', // Protect against redirect-based SSRF bypass
       });
 
-      clearTimeout(timer);
       const latencyMs = Math.round(performance.now() - start);
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
+        const { text: errorText } = await readLimitedResponse(response, HEALTH_RESPONSE_LIMIT_BYTES);
+        clearTimeout(timer);
         return {
           success: false,
           statusCode: response.status,
@@ -148,7 +151,9 @@ export class AgentHttpAdapter {
         };
       }
 
-      const text = await response.text();
+      const { text, exceeded } = await readLimitedResponse(response, HEALTH_RESPONSE_LIMIT_BYTES);
+      clearTimeout(timer);
+      if (exceeded) return { success: false, statusCode: response.status, latencyMs, resolvedIp: ssrf.resolvedIp, errorMessage: `Health response exceeds ${HEALTH_RESPONSE_LIMIT_BYTES} bytes.` };
       let json: any;
       try {
         json = JSON.parse(text);
@@ -238,19 +243,19 @@ export class AgentHttpAdapter {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetch(targetUrl, {
+      const response = await requestPinned(targetUrl, ssrf.resolvedIp!, {
         method: 'POST',
         headers: this.buildHeaders(),
         body: JSON.stringify(validatedRequest.data),
         signal: controller.signal,
-        redirect: 'error',
       });
 
-      clearTimeout(timer);
       const durationMs = Math.round(performance.now() - start);
 
       const contentLength = response.headers.get('content-length');
       if (contentLength && parseInt(contentLength, 10) > this.maxResponseSizeBytes) {
+        clearTimeout(timer);
+        response.body?.cancel().catch(() => undefined);
         return {
           success: false,
           statusCode: response.status,
@@ -260,8 +265,9 @@ export class AgentHttpAdapter {
         };
       }
 
-      const text = await response.text();
-      if (text.length > this.maxResponseSizeBytes) {
+      const { text, exceeded } = await readLimitedResponse(response, this.maxResponseSizeBytes);
+      clearTimeout(timer);
+      if (exceeded) {
         return {
           success: false,
           statusCode: response.status,

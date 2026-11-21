@@ -100,10 +100,17 @@ npx tsx src/tests/stage8.test.ts   # Stage 8 Full Production & Security Audit
 ## Deployment Architecture
 
 ### 1. Web & API Tier (Render, Railway, or VPS)
-- Run `npm run build && npm start`.
+- Build command: `npm ci && npm run build`. Start command: `npm start` (`node build/server.js`).
 - The Express server serves both `/api/*` endpoints and static frontend assets from `dist/`.
-- In-memory rate limiting throttles excessive requests to 120 reqs/min per IP.
+- Rate limits are process-local (10 requests/minute on protected routes); they are not shared across service replicas.
 - Graceful shutdown handles `SIGTERM` and `SIGINT` by stopping incoming requests, draining connections, and closing Redis/BullMQ workers.
+
+#### Render service settings
+- Create one **Web Service** from this repository/branch, runtime **Node**, build `npm ci && npm run build`, start `npm start`.
+- Render supplies `PORT`; add `NODE_ENV=production`, `DATABASE_URL`, `REDIS_URL`, `AGENTARENA_SECRET_KEY` (64 hex chars), and `CORS_ORIGINS` (comma-separated exact public origins, including the `https://` scheme).
+- Apply migrations manually against the intended database with `npm run prisma:migrate:deploy` before releasing the new web build. Do not run migrations from app startup.
+- Use a separate **Background Worker** with the same repository/branch and build command, start `npm run worker`, and the same `NODE_ENV`, `DATABASE_URL`, `REDIS_URL`, and `AGENTARENA_SECRET_KEY` values. Leave `AGENTARENA_WORKER_ENABLED` unset/false on the web service when using this worker.
+- The web service serves the frontend; no separate Static Site is needed. A Render blueprint is not present in this repository.
 
 ### 2. Database Tier (PostgreSQL)
 - Set `DATABASE_URL="postgresql://user:password@host:5432/agentarena"` in production.
@@ -159,9 +166,12 @@ npx tsx src/tests/stage8.test.ts   # Stage 8 Full Production & Security Audit
 | `NODE_ENV` | Optional | `development` | Set to `production` in live deployments |
 | `AGENTARENA_SECRET_KEY` | Required when encrypting credentials; mandatory in production | None | Exactly 32 random bytes encoded as 64 hexadecimal characters |
 | `DATABASE_URL` | Required in production | None | PostgreSQL connection string; selects Prisma-backed repositories |
+| `CORS_ORIGINS` | Required in production | None | Comma-separated exact allowed browser origins |
+| `REDIS_URL` | Required for queue in production | None | Redis URL; use `rediss://` for TLS endpoints such as Upstash |
 | `REDIS_HOST` | Optional | `127.0.0.1` | Redis host for BullMQ background queue |
 | `REDIS_PORT` | Optional | `6379` | Redis port |
 | `REDIS_PASSWORD` | Optional | Empty | Redis authentication password |
+| `AGENTARENA_WORKER_ENABLED` | Optional | `false` | Enable the BullMQ worker inside the web process instead of a separate worker service |
 | `DOCKER_SOCKET` | Optional | `/var/run/docker.sock` | Dedicated worker Docker daemon socket |
 | `BIFROST_ENDPOINT` | Optional | Empty | Bifrost gateway base URL ending in `/v1` |
 | `BIFROST_API_KEY` | Optional | Empty | Bifrost bearer key |
@@ -182,9 +192,9 @@ Provider keys are supplied by each authenticated user in Model Connections. They
 - **Sandbox Isolation**: Untrusted code is never executed directly on the application host server.
 
 
-## Production Remediation Status (2026-11-14)
+## Current Verification Status (2026-11-21)
 
-This source archive is **NOT PRODUCTION READY**. Authentication, session middleware, and server-side resource ownership checks are implemented. PostgreSQL 17.12 was verified on the local `agentarena_test` database; production deployment still requires provisioned Redis/BullMQ and Docker infrastructure, plus Bifrost credentials if that integration is used. JSON files remain preserved as legacy sources and for repeatable import.
+The local offline suite, lint/type check, Prisma validation, and production build pass. Database integration was attempted by the user on Windows and reached PostgreSQL, but the run stopped at a test assertion; the test assertion and cleanup logic were corrected afterward and have not yet been rerun. Do not treat PostgreSQL CRUD/persistence integration as fully verified. BullMQ lifecycle testing requires a dedicated disposable Redis and remains unverified. Render runtime behavior, live provider access, and production logs have not been checked. JSON backups remain preserved.
 
 The API requires an explicit `CORS_ORIGINS` allowlist and production startup checks PostgreSQL connectivity and the `AGENTARENA_SECRET_KEY`. Set the key to 32 random bytes encoded as 64 hex characters. Existing credentials created by the previous SHA-256-derived key format must be migrated first with `npm run crypto:migrate` (set `LEGACY_AGENTARENA_SECRET`, the new `AGENTARENA_SECRET_KEY`, and `CONFIRM_AGENT_SECRET_MIGRATION=true`). The migration makes a timestamped backup and aborts on malformed records; never change the key without this step.
 
@@ -193,7 +203,7 @@ The API requires an explicit `CORS_ORIGINS` allowlist and production startup che
 - `NODE_ENV=production`, `PORT`, `CORS_ORIGINS` (comma-separated exact origins)
 - `AGENTARENA_SECRET_KEY` (64 hex characters)
 - `DATABASE_URL` (required by startup guard; Prisma migrations must be applied)
-- `REDIS_URL` or `REDIS_HOST`, `REDIS_PORT`, and optional `REDIS_PASSWORD`
+- `REDIS_URL` (TLS `rediss://` where required)
 - Run `npm run worker` as a separate background process, or set `AGENTARENA_WORKER_ENABLED=true` in the API service to let that process also consume BullMQ jobs.
 - `BIFROST_ENDPOINT` and `BIFROST_API_KEY` only when using Bifrost
 - Docker is not required for the current HTTP-agent path; the Docker executor is not wired into benchmark orchestration.
@@ -202,11 +212,11 @@ The production `build` command creates the Vite frontend bundle and bundled Node
 
 ## Known Limitations
 
-- Authentication and owner scoping passed database-backed API tests with two users; production multi-instance rate limiting still requires shared Redis.
+- Authentication and owner scoping have offline/API test coverage; the latest full PostgreSQL integration run did not complete. Production multi-instance rate limiting still requires shared Redis.
 - Code task scores default to unverified; no submitted code is run. Explicit text heuristics remain diagnostic only and are excluded from leaderboards. Exact text and canonical JSON matching are currently supported; sandboxed code tests, mathematical checking, and general JSON-schema validation remain unimplemented.
 - Provider usage is recorded, but estimated token cost is unavailable because pricing/version data is not maintained.
 - The HTTP benchmark orchestrator does not use `DockerExecutor`; Docker status is an infrastructure probe, not evidence of sandboxed benchmark execution.
-- PostgreSQL passed against local PostgreSQL 17.12. This audit has not yet verified BullMQ against an isolated Redis test instance; `npm run test:bullmq` requires `AGENTARENA_TEST_REDIS_URL`. Live Bifrost connectivity is unverified.
+- The user reported PostgreSQL 17.12 connectivity, four migrations up to date, six audit agents, and two successful connection logs in `agentarena_test`; these records were not inspected by this environment and must be preserved. The integration script then failed an evaluation assertion; a code-side test fix is not yet rerun. BullMQ against isolated Redis, live Bifrost, and Render are unverified.
 - Import applied to `agentarena_test`: 4 agents, 4 tasks, 1 run, 2 executions, 2 evaluations. It skipped 21 runs and 42 executions with missing parents/duplicate execution IDs; original JSON files and timestamped backups remain. Reapplying inserted zero duplicates.
 - The restricted test environment denies loopback HTTP with `EACCES`; Stage 3–4 fixture suites pass when local networking is permitted.
-- No hosted application, public repository, or walkthrough video has been published.
+- Render deployment state is not verified from this environment.

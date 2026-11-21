@@ -39,6 +39,14 @@ export function isPrivateOrReservedIPv4(ip: string): boolean {
   // 192.0.0.0/24: IETF
   if (b0 === 192 && b1 === 0) return true;
 
+  // Shared, documentation, and benchmarking ranges are not globally routable.
+  if (b0 === 100 && b1 >= 64 && b1 <= 127) return true; // 100.64.0.0/10
+  if (b0 === 192 && b1 === 0 && parts[2] === 2) return true; // 192.0.2.0/24
+  if (b0 === 198 && b1 === 18) return true; // 198.18.0.0/15
+  if (b0 === 198 && b1 === 19) return true;
+  if (b0 === 198 && b1 === 51 && parts[2] === 100) return true; // 198.51.100.0/24
+  if (b0 === 203 && b1 === 0 && parts[2] === 113) return true; // 203.0.113.0/24
+
   // 224.0.0.0/4: Multicast & 240.0.0.0/4: Reserved
   if (b0 >= 224) return true;
 
@@ -49,35 +57,16 @@ export function isPrivateOrReservedIPv4(ip: string): boolean {
  * Checks if an IPv6 address is private, loopback, or unique-local
  */
 export function isPrivateOrReservedIPv6(ip: string): boolean {
-  const normalized = ip.toLowerCase();
-
-  // ::1 loopback
-  if (normalized === '::1' || normalized === '0:0:0:0:0:0:0:1') return true;
-
-  // :: unspecified
-  if (normalized === '::' || normalized === '0:0:0:0:0:0:0:0') return true;
-
-  // Link-local fe80::/10
-  if (normalized.startsWith('fe8') || normalized.startsWith('fe9') || normalized.startsWith('fea') || normalized.startsWith('feb')) {
-    return true;
-  }
-
-  // Unique local fc00::/7 (fc00:: to fdff::)
-  if (normalized.startsWith('fc') || normalized.startsWith('fd')) {
-    return true;
-  }
-
-  // IPv4-mapped IPv6: ::ffff:192.168.x.x
-  if (normalized.includes('::ffff:')) {
-    const v4Part = normalized.split('::ffff:')[1];
-    if (v4Part && net.isIPv4(v4Part)) {
-      return isPrivateOrReservedIPv4(v4Part);
-    }
-    return true;
-  }
-
-  return false;
+  if (!net.isIPv6(ip)) return true;
+  try { return BLOCKED_IPV6.check(ip, 'ipv6'); } catch { return true; }
 }
+
+const BLOCKED_IPV6 = new net.BlockList();
+for (const [subnet, prefix] of [
+  ['::', 128], ['::1', 128], ['::ffff:0:0', 96], ['64:ff9b::', 96],
+  ['64:ff9b:1::', 48], ['100::', 64], ['2001::', 23], ['2001:db8::', 32],
+  ['2002::', 16], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8],
+] as const) BLOCKED_IPV6.addSubnet(subnet, prefix, 'ipv6');
 
 /**
  * Validates a target URL against SSRF attacks.
@@ -87,14 +76,20 @@ export async function validateEndpointForSsrf(
   urlString: string,
   options: { allowLocal?: boolean } = {}
 ): Promise<SsrfValidationResult> {
-  const allowLocal = options.allowLocal ?? (process.env.ALLOW_LOCAL_TEST_AGENTS === 'true' || process.env.NODE_ENV !== 'production');
   const isProduction = process.env.NODE_ENV === 'production';
+  // Local fixtures are never allowed in production, even if an environment
+  // variable or caller accidentally opts in.
+  const allowLocal = !isProduction && (options.allowLocal ?? (process.env.ALLOW_LOCAL_TEST_AGENTS === 'true' || process.env.NODE_ENV !== 'production'));
 
   let parsed: URL;
   try {
     parsed = new URL(urlString);
   } catch {
     return { valid: false, reason: 'Invalid URL format' };
+  }
+
+  if (parsed.username || parsed.password) {
+    return { valid: false, reason: 'Credentials must not be embedded in agent endpoint URLs.' };
   }
 
   // 1. Protocol check
@@ -107,7 +102,7 @@ export async function validateEndpointForSsrf(
     return { valid: false, reason: 'HTTPS is required in production environments.' };
   }
 
-  const hostname = parsed.hostname.toLowerCase();
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
 
   // 2. Known dangerous hostnames & metadata services
   const blockedHostnames = [

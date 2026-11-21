@@ -51,6 +51,20 @@ async function runStage8Tests() {
   const rawIpRes = await validateEndpointForSsrf('http://169.254.169.254/latest/meta-data/', { allowLocal: false });
   assert(!rawIpRes.valid, 'Security: SSRF strictly blocks raw cloud metadata IP 169.254.169.254');
 
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousLocalOverride = process.env.ALLOW_LOCAL_TEST_AGENTS;
+  process.env.NODE_ENV = 'production';
+  process.env.ALLOW_LOCAL_TEST_AGENTS = 'true';
+  const productionLoopback = await validateEndpointForSsrf('http://127.0.0.1:5432/', { allowLocal: true });
+  assert(!productionLoopback.valid, 'Production SSRF protection ignores explicit local-network overrides');
+  process.env.NODE_ENV = previousNodeEnv;
+  if (previousLocalOverride === undefined) delete process.env.ALLOW_LOCAL_TEST_AGENTS;
+  else process.env.ALLOW_LOCAL_TEST_AGENTS = previousLocalOverride;
+  assert(isPrivateOrReservedIPv4('100.64.0.1'), 'SSRF blocks shared carrier-grade address space');
+  assert(isPrivateOrReservedIPv4('198.51.100.3'), 'SSRF blocks documentation-only address space');
+  assert(!isPrivateOrReservedIPv6('2606:4700:4700::1111'), 'public IPv6 remains allowed');
+  assert(!(await validateEndpointForSsrf('https://user:secret@example.com/')).valid, 'Agent URLs reject embedded credentials');
+
   // 2. Security: AES-256-GCM Credential Protection & Redaction
   const testSecret = 'sk-prod-agentarena-live-api-key-9912048';
   const encrypted = encryptSecret(testSecret);

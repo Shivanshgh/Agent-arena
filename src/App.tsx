@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Server,
   ShieldCheck,
@@ -38,7 +38,9 @@ import {
   Box,
   Network,
   Sliders,
-  PieChart
+  PieChart,
+  Menu,
+  X
 } from 'lucide-react';
 import { Agent, ConnectionTestResult, StandardizedAgentRequest, StandardizedAgentResponse } from './types/agent';
 import { BenchmarkTask, BenchmarkRun, TaskDifficulty, EvaluationStrategy, RunStatus, ExecutionStatus } from './types/benchmark';
@@ -56,6 +58,29 @@ const COMMON_CAPABILITIES = [
 
 export default function App({ user, onLogout }: { user: { email: string; role: 'USER' | 'ADMIN' }; onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<'registry' | 'tasks' | 'runs' | 'leaderboard' | 'model-leaderboard' | 'models' | 'analytics' | 'infrastructure' | 'docs'>('leaderboard');
+  const [isNavigationOpen, setIsNavigationOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!isNavigationOpen) return;
+    drawerRef.current?.querySelector<HTMLButtonElement>('button[data-drawer-close]')?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsNavigationOpen(false);
+        menuButtonRef.current?.focus();
+        return;
+      }
+      if (event.key !== 'Tab' || !drawerRef.current) return;
+      const items = Array.from(drawerRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'));
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isNavigationOpen]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [modelConnections, setModelConnections] = useState<Array<{ id: string; provider: string; modelId: string; displayName: string }>>([]);
   const [modelConnectionChecks, setModelConnectionChecks] = useState<Record<string, { status: string; error?: string }>>({});
@@ -569,127 +594,65 @@ export default function App({ user, onLogout }: { user: { email: string; role: '
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans selection:bg-cyan-500/20 selection:text-cyan-300">
       {/* Header */}
-      <header className="border-b border-neutral-800 bg-neutral-900/60 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex min-w-0 items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-indigo-600 to-amber-500 flex items-center justify-center shadow-lg shadow-cyan-500/10 border border-neutral-700">
+      <header className="border-b border-neutral-800 bg-neutral-900/90 backdrop-blur sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 min-h-16 py-2.5 flex items-center gap-2 sm:gap-4">
+          <button ref={menuButtonRef} onClick={() => setIsNavigationOpen(true)} aria-label="Open navigation menu" aria-haspopup="dialog" aria-expanded={isNavigationOpen} className="shrink-0 rounded-lg border border-neutral-700 p-2.5 text-neutral-200 hover:bg-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400">
+            <Menu className="w-5 h-5" aria-hidden="true" />
+          </button>
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3 mr-auto">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 via-indigo-600 to-amber-500 flex items-center justify-center shadow-lg shadow-cyan-500/10 border border-neutral-700 shrink-0">
               <Swords className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-bold tracking-tight text-lg text-white">AgentArena</span>
-              </div>
-              <p className="text-xs text-neutral-400">AI Coding Agent Benchmark & Evaluation</p>
+            <div className="min-w-0">
+              <span className="font-bold tracking-tight text-base sm:text-lg text-white">AgentArena</span>
+              <p className="hidden sm:block text-[11px] text-neutral-400 truncate">AI Coding Agent Benchmark & Evaluation</p>
             </div>
           </div>
-
-          {/* Navigation */}
-          <nav aria-label="Main navigation" className="flex w-full md:w-auto max-w-full min-w-0 items-center space-x-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1 overflow-x-auto">
-            <button
-              onClick={() => { setActiveTab('leaderboard'); setViewingRun(null); }}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
-                activeTab === 'leaderboard' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <Trophy className="w-3.5 h-3.5 text-amber-400" />
-              <span>Leaderboard</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-neutral-800 text-neutral-400">{leaderboard.length}</span>
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <button onClick={() => openNewRunWizard()} aria-label="Launch Battle" className="inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-semibold text-xs p-2.5 sm:px-3.5 sm:py-2 rounded-lg shadow-sm shadow-amber-500/20 transition active:scale-95">
+              <Flame className="w-4 h-4 fill-current" aria-hidden="true" /><span className="hidden sm:inline">Launch Battle</span>
             </button>
-
-            <button
-              onClick={() => { setActiveTab('analytics'); setViewingRun(null); }}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
-                activeTab === 'analytics' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Analytics</span>
+            <button onClick={() => openTaskModal()} aria-label="New Task" className="inline-flex items-center justify-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-medium p-2.5 sm:px-3 sm:py-2 rounded-lg transition">
+              <Plus className="w-4 h-4 text-cyan-400" aria-hidden="true" /><span className="hidden sm:inline">New Task</span>
             </button>
-
-            <button onClick={() => { setActiveTab('models'); setViewingRun(null); }} className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${activeTab === 'models' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}>
-              <Cpu className="w-3.5 h-3.5 text-violet-400" /><span>Model Connections</span>
-            </button>
-            <button onClick={() => { setActiveTab('model-leaderboard'); setViewingRun(null); }} className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${activeTab === 'model-leaderboard' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}>
-              <Trophy className="w-3.5 h-3.5 text-violet-400" /><span>Model Leaderboard</span>
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('tasks'); setViewingRun(null); }}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
-                activeTab === 'tasks' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <ListTodo className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Tasks</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-neutral-800 text-neutral-400">{tasks.length}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('runs')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
-                activeTab === 'runs' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <Swords className="w-3.5 h-3.5 text-amber-400" />
-              <span>Battles & Runs</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-neutral-800 text-neutral-400">{runs.length}</span>
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('registry'); setViewingRun(null); }}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
-                activeTab === 'registry' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <Database className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Agents</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-neutral-800 text-neutral-400">{agents.length}</span>
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('infrastructure'); setViewingRun(null); }}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
-                activeTab === 'infrastructure' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Infrastructure</span>
-              <span className={`w-2 h-2 rounded-full ${infraStatus?.docker.isolationReady && infraStatus?.redis.status === 'CONNECTED' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('docs'); setViewingRun(null); }}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
-                activeTab === 'docs' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5 text-neutral-400" />
-              <span>Protocol v1.0</span>
-            </button>
-          </nav>
-
-          {/* Quick Actions */}
-          <div className="flex w-full md:w-auto flex-wrap items-center gap-2">
-            <span className="hidden xl:inline text-xs text-neutral-400">{user.email}</span>
-            <button onClick={onLogout} className="rounded-lg border border-neutral-700 px-3 py-2 text-xs text-neutral-300 hover:text-white">Sign out</button>
-            <button
-              onClick={() => openNewRunWizard()}
-              className="inline-flex items-center space-x-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-semibold text-xs px-3.5 py-2 rounded-lg shadow-sm shadow-amber-500/20 transition active:scale-95 cursor-pointer"
-            >
-              <Flame className="w-3.5 h-3.5 fill-current" />
-              <span>Launch Battle</span>
-            </button>
-
-            <button
-              onClick={() => openTaskModal()}
-              className="inline-flex items-center space-x-1.5 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-medium px-3 py-2 rounded-lg transition"
-            >
-              <Plus className="w-3.5 h-3.5 text-cyan-400" />
-              <span>New Task</span>
-            </button>
+            <details className="relative group">
+              <summary aria-label={`Account: ${user.email}`} className="list-none cursor-pointer rounded-lg border border-neutral-700 px-2.5 py-2 text-xs text-neutral-300 hover:bg-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 max-w-36 sm:max-w-48 truncate">
+                <span className="hidden sm:inline">{user.email}</span><span className="sm:hidden">Account</span>
+              </summary>
+              <div className="absolute right-0 mt-2 w-56 rounded-xl border border-neutral-700 bg-neutral-900 p-3 shadow-xl">
+                <p className="mb-3 truncate text-xs text-neutral-300">{user.email}</p>
+                <button onClick={onLogout} className="w-full rounded-lg border border-neutral-700 px-3 py-2 text-left text-xs text-neutral-200 hover:bg-neutral-800">Sign out</button>
+              </div>
+            </details>
           </div>
         </div>
       </header>
+
+      {isNavigationOpen && <div className="fixed inset-0 z-50">
+        <button aria-label="Close navigation menu" tabIndex={-1} onClick={() => setIsNavigationOpen(false)} className="absolute inset-0 h-full w-full cursor-default bg-black/60 backdrop-blur-[2px]" />
+        <aside ref={drawerRef} role="dialog" aria-modal="true" aria-labelledby="navigation-drawer-title" className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-neutral-700 bg-neutral-950 shadow-2xl animate-in slide-in-from-left duration-200">
+          <div className="flex items-center justify-between border-b border-neutral-800 p-4">
+            <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-600 via-indigo-600 to-amber-500"><Swords className="h-5 w-5 text-white" /></div><div><h2 id="navigation-drawer-title" className="font-semibold text-white">AgentArena</h2><p className="text-xs text-neutral-400">Navigation</p></div></div>
+            <button data-drawer-close onClick={() => { setIsNavigationOpen(false); menuButtonRef.current?.focus(); }} aria-label="Close navigation menu" className="rounded-lg p-2 text-neutral-300 hover:bg-neutral-800"><X className="h-5 w-5" /></button>
+          </div>
+          <nav aria-label="Main navigation" className="flex-1 space-y-1 overflow-y-auto p-3">
+            {[
+              { id: 'leaderboard', label: 'Leaderboard', icon: <Trophy className="h-4 w-4 text-amber-400" />, count: leaderboard.length },
+              { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="h-4 w-4 text-cyan-400" /> },
+              { id: 'models', label: 'Model Connections', icon: <Cpu className="h-4 w-4 text-violet-400" /> },
+              { id: 'model-leaderboard', label: 'Model Leaderboard', icon: <Trophy className="h-4 w-4 text-violet-400" /> },
+              { id: 'tasks', label: 'Tasks', icon: <ListTodo className="h-4 w-4 text-cyan-400" />, count: tasks.length },
+              { id: 'runs', label: 'Battles & Runs', icon: <Swords className="h-4 w-4 text-amber-400" />, count: runs.length },
+              { id: 'registry', label: 'Agents', icon: <Database className="h-4 w-4 text-indigo-400" />, count: agents.length },
+              { id: 'infrastructure', label: 'Infrastructure', icon: <Cpu className="h-4 w-4 text-emerald-400" />, status: infraStatus?.docker.isolationReady && infraStatus?.redis.status === 'CONNECTED' },
+              { id: 'docs', label: 'Protocol v1.0', icon: <BookOpen className="h-4 w-4 text-neutral-400" /> },
+            ].map(item => <button key={item.id} onClick={() => { setActiveTab(item.id as typeof activeTab); if (item.id !== 'runs') setViewingRun(null); setIsNavigationOpen(false); }} aria-current={activeTab === item.id ? 'page' : undefined} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 ${activeTab === item.id ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-300 hover:bg-neutral-900 hover:text-white'}`}>
+              {item.icon}<span className="flex-1">{item.label}</span>{'count' in item && <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-400">{item.count}</span>}{'status' in item && <span aria-label={item.status ? 'Ready' : 'Needs attention'} className={`h-2 w-2 rounded-full ${item.status ? 'bg-emerald-400' : 'bg-amber-400'}`} />}
+            </button>)}
+          </nav>
+          <div className="border-t border-neutral-800 p-4 text-xs text-neutral-500 truncate">Signed in as {user.email}</div>
+        </aside>
+      </div>}
 
       {/* Main Container */}
       <main className="flex-1 min-w-0 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">

@@ -1,5 +1,16 @@
 # Product Readiness
 
+## Latest assessment — Phase 8 security audit (2026-11-21)
+
+**Evidence-based readiness estimate: 57% (not a production-readiness certification).** Reusing the prior weighted categories and lowering Security/Data Integrity from 90% to 75% for the unresolved DNS rebinding and rate-limit deployment risks gives `85×30% + 25×25% + 40×20% + 75×15% + 60×10% = 57%`. The estimate remains limited by unreliable correctness scoring, unverified live queue/Render behavior, and incomplete PostgreSQL integration after a test assertion failure.
+
+- Security improvements in this audit: production local-network override blocked; response bodies bounded; response timeouts cover body reads; IPv4 reserved/shared ranges expanded; URL userinfo rejected.
+- Remaining security issue: DNS validation and `fetch` use separate DNS resolutions; safe socket pinning/egress policy is not implemented. Rate limits are process-local.
+- Provider HTTP response JSON is not byte-capped yet; official fixed provider hosts and token limits reduce, but do not remove, that resource risk.
+- `npm test`, Prisma validation, TypeScript, and production build pass. Dependency advisory scan is **NOT VERIFIED** because npm registry DNS is unavailable.
+- User-run PostgreSQL evidence is **PARTIAL**: target and migrations are good; model exact-evaluation assertion failed, and historical cleanup/snapshot verification has not been rerun.
+- Redis/BullMQ live processing, Render security settings, live providers, and Bifrost remain **NOT VERIFIED**.
+
 ## Achievement calculation
 
 Scores reflect verified functionality, with explicit penalties for the unavailable production queue and heuristic scoring.
@@ -54,3 +65,10 @@ PostgreSQL remains BLOCKED (port 5432 unreachable); dedicated Redis remains BLOC
 - Persistence/leaderboard for three distinct agents: NOT VERIFIED in this run.
 - Scoring correctness: FAIL as an actual correctness measure; it is a response-text heuristic. Weighted arithmetic itself passes unit checks.
 - Code execution in a sandbox: NOT AVAILABLE; do not execute submitted code on the host.
+
+## Final pre-submission status — 2026-11-21
+
+- **Local application:** PASS for full automated suite, lint/TypeScript, Prisma validation, and production build. Existing UI functions are retained; header navigation now uses a responsive drawer. Browser-level UI testing is unavailable in the current test setup.
+- **Database and queue:** NOT VERIFIED end-to-end. User reports `agentarena_test` is available and contains audit fixtures; Codex did not connect, migrate, reset, or delete anything. The prior database integration run stopped at an evaluation assertion; a test-side fix is pending rerun. Isolated BullMQ tests still require a dedicated disposable Redis.
+- **Deployment:** NOT VERIFIED. Render runtime, environment, worker, and live persistence were not accessed. README now documents exact web/worker settings and migration sequencing.
+- **Readiness:** source is prepared for user review, but live queue/database deployment verification and secure code-execution scoring remain blockers to claiming full submission readiness. No commit or deployment was made.

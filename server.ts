@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { apiRouter } from './src/server/routes';
 import { connectRuntimeDb, runtimeDb, shutdownRuntimeDb } from './src/server/runtime-db';
 import { createAuthMiddleware } from './src/server/auth';
+import { setSecurityHeaders } from './src/server/security-headers';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,11 +32,8 @@ async function startServer() {
   const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
   app.use((req, res, next) => {
-    // Security headers
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    const forwardedProto = req.get('x-forwarded-proto')?.split(',')[0].trim().toLowerCase();
+    setSecurityHeaders(res, { production: isProduction, https: req.secure || forwardedProto === 'https' });
 
     // CORS headers
     const origin = req.headers.origin;

@@ -330,7 +330,7 @@ apiRouter.delete('/agents/:id', async (req: Request, res: Response) => {
 });
 
 // Test Agent Connection (Health Check)
-apiRouter.post('/agents/:id/test-connection', async (req: Request, res: Response) => {
+apiRouter.post('/agents/:id/test-connection', authRateLimit(), async (req: Request, res: Response) => {
   const record = await runtimeDb.getAgentWithSecret(req.params.id, req.authUser);
   if (!record) {
     return res.status(404).json({ success: false, error: 'Agent not found' });
@@ -373,7 +373,7 @@ apiRouter.get('/agents/:id/connection-logs', async (req: Request, res: Response)
 });
 
 // Execute Standardized Task against Agent
-apiRouter.post('/agents/:id/execute', async (req: Request, res: Response) => {
+apiRouter.post('/agents/:id/execute', authRateLimit(), async (req: Request, res: Response) => {
   const record = await runtimeDb.getAgentWithSecret(req.params.id, req.authUser);
   if (!record) {
     return res.status(404).json({ success: false, error: 'Agent not found' });
@@ -418,7 +418,7 @@ apiRouter.post('/agents/:id/execute', async (req: Request, res: Response) => {
 });
 
 // Direct SSRF & Health verification endpoint for UI registration wizard
-apiRouter.post('/test-endpoint-direct', async (req: Request, res: Response) => {
+apiRouter.post('/test-endpoint-direct', authRateLimit(), async (req: Request, res: Response) => {
   const { endpoint, authType = 'NONE', authHeaderName, authSecret } = req.body;
   if (!endpoint || typeof endpoint !== 'string') {
     return res.status(400).json({ success: false, error: 'Endpoint URL is required' });
@@ -608,7 +608,7 @@ apiRouter.get('/runs/:id', async (req: Request, res: Response) => {
 });
 
 // Launch a new benchmark run (requires >= 2 eligible agents)
-apiRouter.post('/runs', async (req: Request, res: Response) => {
+apiRouter.post('/runs', authRateLimit(), async (req: Request, res: Response) => {
   const parsed = CreateRunSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -663,7 +663,7 @@ apiRouter.get('/evaluations/config', (_req: Request, res: Response) => {
 });
 
 // Evaluate a completed benchmark run
-apiRouter.post('/runs/:id/evaluate', async (req: Request, res: Response) => {
+apiRouter.post('/runs/:id/evaluate', authRateLimit(), async (req: Request, res: Response) => {
   const run = await runtimeDb.getRun(req.params.id, req.authUser);
   if (!run) {
     return res.status(404).json({ success: false, error: 'Benchmark run not found' });

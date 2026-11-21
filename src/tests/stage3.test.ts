@@ -1,4 +1,5 @@
 import http from 'http';
+import dns from 'node:dns';
 import assert from 'assert';
 import { agentDb } from '../server/db';
 import { encryptSecret, decryptSecret, redactSecret } from '../server/crypto';
@@ -156,6 +157,14 @@ async function runStage3Tests() {
         }
 
         if (url.pathname === '/health') {
+          if (url.searchParams.get('mode') === 'redirect') {
+            res.writeHead(302, { Location: 'http://127.0.0.1:1/private' });
+            return res.end();
+          }
+          if (url.searchParams.get('mode') === 'large') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            return res.end(' '.repeat(70_000));
+          }
           if (url.searchParams.get('mode') === '500') {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             return res.end(JSON.stringify({ error: 'Internal crash' }));
@@ -175,8 +184,14 @@ async function runStage3Tests() {
         }
 
         if (url.pathname === '/execute') {
+          if (url.searchParams.get('mode') === 'large') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            return res.end(' '.repeat(70_000));
+          }
           if (url.searchParams.get('mode') === 'hang') {
-            // Keep request hanging for timeout test
+            // Return headers but leave the body open to test body-read timeout.
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.write('{');
             return;
           }
 
@@ -229,6 +244,21 @@ async function runStage3Tests() {
     assert(health.latencyMs >= 0);
   });
 
+  await test('SSRF: Uses the validated DNS address for the socket connection', async () => {
+    const lookup = dns.promises.lookup;
+    let calls = 0;
+    (dns.promises as any).lookup = async () => {
+      calls++;
+      return [{ address: calls === 1 ? '127.0.0.1' : '10.0.0.9', family: 4 }];
+    };
+    try {
+      const adapter = new AgentHttpAdapter(`http://rebinding-fixture.invalid:${fixturePort}`, { type: 'NONE' }, { allowLocal: true });
+      const health = await adapter.checkHealth();
+      assert.equal(health.success, true);
+      assert.equal(calls, 1, 'the socket must use the already-validated IP without resolving the hostname again');
+    } finally { (dns.promises as any).lookup = lookup; }
+  });
+
   await test('HTTP Adapter: Injects Bearer token authorization correctly', async () => {
     const authedAdapter = new AgentHttpAdapter(
       `http://127.0.0.1:${fixturePort}?auth=required`,
@@ -257,12 +287,32 @@ async function runStage3Tests() {
     assert(health.errorMessage?.includes('HTTP 500'));
   });
 
+  await test('SSRF: Rejects redirects instead of following a second destination', async () => {
+    const result = await new AgentHttpAdapter(`http://127.0.0.1:${fixturePort}?mode=redirect`, { type: 'NONE' }, { allowLocal: true }).checkHealth();
+    assert.equal(result.success, false);
+    assert.match(result.errorMessage || '', /redirects are not permitted/i);
+  });
+
   await test('HTTP Adapter: Rejects malformed JSON from agent', async () => {
     const adapter = new AgentHttpAdapter(`http://127.0.0.1:${fixturePort}?mode=malformed`, { type: 'NONE' }, { allowLocal: true });
     const health = await adapter.checkHealth();
 
     assert.strictEqual(health.success, false);
     assert(health.errorMessage?.includes('invalid JSON'));
+  });
+
+  await test('HTTP Adapter: Bounds health and execution response bodies', async () => {
+    const health = await new AgentHttpAdapter(`http://127.0.0.1:${fixturePort}?mode=large`, { type: 'NONE' }, { allowLocal: true }).checkHealth();
+    assert.equal(health.success, false);
+    assert(health.errorMessage?.includes('exceeds'));
+    const adapter = new AgentHttpAdapter(`http://127.0.0.1:${fixturePort}?mode=large`, { type: 'NONE' }, { allowLocal: true, maxResponseSizeBytes: 1024 });
+    const result = await adapter.executeTask({
+      protocolVersion: '1.0', requestId: 'test-large-response',
+      task: { taskId: 'task-large-response', title: 'Large response', description: 'test', language: 'text', input: {} },
+      constraints: { timeoutSeconds: 5, maxOutputSizeBytes: 100_000 },
+    });
+    assert.equal(result.success, false);
+    assert(result.errorMessage?.includes('exceeds'));
   });
 
   await test('HTTP Adapter: Executes standardized task and validates protocol v1.0 response', async () => {

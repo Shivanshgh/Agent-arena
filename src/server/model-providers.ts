@@ -1,4 +1,7 @@
+import { readLimitedResponse } from './limited-response';
+
 export type ModelProviderId = 'GEMINI' | 'OPENAI' | 'ANTHROPIC' | 'DEEPSEEK';
+const MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024;
 
 export interface ModelUsage { inputTokens: number | null; outputTokens: number | null; }
 export interface ModelResult { content: string; usage: ModelUsage; provider: ModelProviderId; modelId: string; durationMs: number; }
@@ -44,13 +47,16 @@ async function requestJson(provider: ModelProviderId, key: string, path: string,
       headers: { ...headers(provider, key), ...(init.headers as Record<string, string> | undefined) },
     });
     if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
       const retryable = response.status === 429 || response.status >= 500;
       const message = response.status === 401 || response.status === 403 ? 'Provider rejected the API key.'
         : response.status === 404 ? 'The selected model or provider endpoint is unavailable.'
           : response.status === 429 ? 'Provider rate limit reached.' : `Provider request failed (${response.status}).`;
       throw new ModelProviderError(message, response.status, retryable);
     }
-    try { return await response.json(); }
+    const { text, exceeded } = await readLimitedResponse(response, MAX_PROVIDER_RESPONSE_BYTES);
+    if (exceeded) throw new ModelProviderError('Provider response exceeded the size limit.', 502);
+    try { return JSON.parse(text); }
     catch { throw new ModelProviderError('Provider returned malformed JSON.', 502); }
   } catch (error) {
     if (error instanceof ModelProviderError) throw error;

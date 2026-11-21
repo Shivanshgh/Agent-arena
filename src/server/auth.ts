@@ -88,7 +88,7 @@ export function clearSessionCookie(res: Response): void {
 export function authRateLimit() {
   const hits = new Map<string, { count: number; resetAt: number }>();
   return (req: Request, res: Response, next: NextFunction) => {
-    const key = req.socket.remoteAddress || 'unknown';
+    const key = req.authUser?.id ? `user:${req.authUser.id}` : `ip:${req.socket.remoteAddress || 'unknown'}`;
     const now = Date.now();
     if (hits.size > 5000) for (const [ip, hit] of hits) if (hit.resetAt <= now) hits.delete(ip);
     const entry = hits.get(key);

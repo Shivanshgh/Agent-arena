@@ -12,6 +12,37 @@
 
 No claim is made that live Render Redis configuration or queue processing is repaired. The safe local queue integration is blocked pending a separate test Redis endpoint.
 
+## Phase 8 security audit — 2026-11-21
+
+| ID | Severity | Finding / exploitability | Fix / recommendation |
+|---|---|---|---|
+| S-01 | Fixed | DNS rebinding/TOCTOU: separate DNS validation followed by `fetch` could resolve to another IP. | Fixed locally: `src/server/pinned-http.ts` connects directly to the IP checked by SSRF validation, checks the connected socket IP, and retains the original hostname for HTTPS SNI/certificate verification. Redirects remain rejected. DNS rebinding regression passes. |
+| S-02 | Medium | Global and login/register limits still use in-memory maps; they reset on restart and do not coordinate across replicas. Behind a proxy, the global IP bucket may be shared. Costly agent tests/execution, benchmark runs/evaluations, registration/login, and provider connection tests now also have the existing 10/minute limiter; authenticated actions key on account ID. | Redis can support shared limits with atomic counters/TTL and a dedicated key prefix, but coupling to the BullMQ Redis could make both functions share failure/capacity. Distributed storage is not implemented or live-tested; use an isolated test Redis and preferably a separate logical instance/namespace before deployment. |
+| S-03 | Low | `NODE_ENV` controls production HTTPS and local-address policy. If a deployment omits `NODE_ENV=production`, the development path permits local HTTP endpoints. This is a deployment misconfiguration risk, not verified on Render. | Ensure production deployment explicitly sets `NODE_ENV=production`; verify environment at startup/deployment. |
+| S-04 | Low | AI semantic review remains susceptible to model-level prompt injection in principle. | Reduced: fixed evaluator policy is sent as a separate system message; task and candidate response are JSON user data, output remains schema-bounded and separate from deterministic scores. This is not a formal guarantee against model manipulation; keep it advisory. |
+| S-05 | Informational | Custom evaluation weights are accepted (`src/types/evaluation.ts:74-86`) and can change an owner's stored score on recalculation. Current user leaderboard data is owner-scoped; this is not cross-user score tampering, but owner-controlled scores are not comparable across benchmark settings. | Preserve weight/version provenance and use server-fixed weights for any public competition leaderboard. |
+| S-06 | Fixed | Production previously omitted explicit CSP and HSTS. | Added production CSP; HSTS is sent only when the request is HTTPS (`req.secure` or forwarded protocol is HTTPS), without `includeSubDomains`/preload. Development headers remain unchanged. Header policy tests pass. |
+| S-07 | Low | Agent endpoint query strings are stored as part of the endpoint. Embedded username/password URL credentials are now rejected, but query parameters may still contain user-provided secrets and are returned to that same owner. | Put credentials in the dedicated encrypted auth fields; avoid secret-bearing endpoint query parameters. |
+| S-08 | Fixed | Provider and Bifrost responses were read without an effective streaming cap. | Both now use bounded streaming reads (2 MiB); oversized replies are cancelled and produce generic errors without provider body or credential disclosure. Regression tests pass. |
+
+### Fixed during this audit
+
+- Production now ignores `allowLocal` options and `ALLOW_LOCAL_TEST_AGENTS`; private/loopback targets remain blocked.
+- HTTP agents connect directly to the validated IP, verify the socket's peer address, retain HTTPS SNI/hostname verification, and reject redirects.
+- Added blocks for shared carrier-grade, documentation-only, and benchmarking IPv4 ranges; reject URL-embedded username/password.
+- Health and execution response bodies are now streamed with byte caps (64 KiB health, configured execution cap); request timeouts remain active while reading the response body.
+- Provider and Bifrost reply bodies are streamed with a 2 MiB cap; oversized content is cancelled and not returned.
+- Added a separate evaluator system policy, JSON-encoded untrusted task/response data, per-account local limits for costly routes, production CSP and HTTPS-only HSTS.
+- Regression coverage added for DNS pinning, IP ranges, embedded credentials, bounded agent/provider/Bifrost responses, evaluator prompt separation, rate limits, and headers.
+
+### Reviewed with no issue found
+
+- Session tokens are random, only SHA-256 hashes are stored, cookies are HttpOnly/SameSite Strict and Secure in production; passwords use scrypt.
+- Agent/provider API credentials are AES-256-GCM encrypted at rest; public agent/model views omit secrets. Provider calls use fixed official hosts and normalize errors without including keys.
+- Route data access is owner-scoped for agents, runs, model connections, evaluations and model leaderboards; foreign objects resolve as not found. Prisma is parameterized; no unsafe SQL was found in application routes.
+- Mutating API calls require an allowlisted Origin/Referer; CORS uses exact origins. JSON bodies are limited to 2 MiB. No unsafe `innerHTML`/`dangerouslySetInnerHTML` use or submitted-code execution on the host was found.
+- Docker executor uses fixed commands, digest-pinned configured images and restrictive container flags; Docker is not on the HTTP-agent path. No user-controlled file path handling was found.
+
 ## E2E verification update (2026-11-20)
 
 - **B-08 | Critical |** Scoring heuristic can reward source text containing the sample expected output and penalize a general solution that computes it without embedding the literal. Partial/constant answers can tie or outrank correct general solutions. Confirmed by inspection of evaluator rules and the planned fixture assertions; full DB-backed comparison blocked because local PostgreSQL was offline. Do not describe accuracy as functional correctness.
@@ -40,3 +71,9 @@ The blockers persist: `agentarena_test` is configured but PostgreSQL is unreacha
 
 - Test contract bug: `/runs/:id/evaluate` returns model executions with nested `.evaluation`; test incorrectly read `accuracyScore` and `evaluationStatus` from the top level. Corrected the assertions.
 - Cleanup bug: temporary agent names did not start with the cleanup marker; owner deletion sets `ownerId` NULL, leaving likely three fixture agents. Corrected cleanup to delete rows by the two unique generated test-user IDs. These fixes have syntax checks only; no DB rerun yet.
+
+## Final pre-submission update (2026-11-21)
+
+- Header navigation was moved into a responsive, keyboard-accessible drawer without removing any of the nine existing sections or the Launch Battle/New Task actions. No new UI regression was found by typecheck/build; browser interaction is not automated in this repository.
+- Full local tests pass when local HTTP fixtures can bind/connect. In this restricted environment the initial run's Stage 3–4 failures were `EACCES` loopback restrictions, not an app regression; rerun with loopback access passed.
+- No live PostgreSQL, Redis/BullMQ, provider, or Render issue was tested in this pass. User-reported database fixtures remain untouched.

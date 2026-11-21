@@ -114,3 +114,41 @@ Default restricted `npm test` initially failed local HTTP fixtures; rerun with l
 - Model benchmark exact evaluation assertion: **FAIL** because test expected flat score properties while API returns `{ evaluation: { accuracyScore, evaluationStatus, ... } }`. Updated the test to inspect nested evaluation.
 - Snapshot warning cause: test cleanup filtered agents with the wrong name prefix. Unique test agents use `Audit <uuid-prefix> ...`; their owner FK uses SET NULL, leaving them after deleting the test user. Cleanup now deletes rows owned by only the generated test users before deleting them. Actual post-run row count remains unverified.
 - HTTP benchmark workflow, model leaderboard, persistence-after-restart, and post-cleanup snapshot assertions were not reached. No Codex DB changes or cleanup. Do not claim PostgreSQL integration passed.
+
+## Phase 8 security verification — 2026-11-21
+
+| Check | Result | Evidence / limit |
+|---|---|---|
+| Full `npm test` | PASS | Exit 0: Stage 3 17/17, Stage 4 8/8, Stage 5 9/9, Stage 6 6/6, Stage 7 9/9, Stage 8 22/22, plus Stage 9 auth/ownership, Stage 10 Bifrost, provider mocks and model orchestration. Temporary local mock fixtures and a process-only test key were used. |
+| SSRF production local override | PASS | `allowLocal: true` and `ALLOW_LOCAL_TEST_AGENTS=true` cannot allow loopback in production mode; shared/documentation IP ranges and URL userinfo are also covered. |
+| HTTP response bounds/timeouts | PASS | Health body capped at 64 KiB; execution body capped at configured bytes; oversized chunked fixture rejected; timeout remains active during body reads. |
+| Prisma validation / TypeScript / build | PASS | `npm run prisma:validate`, `npm run lint`, `npm run build`. Existing Vite config-loader warning is non-blocking. |
+| Dependency audit | NOT VERIFIED | `npm audit --omit=dev` could not resolve `registry.npmjs.org` (`ENOTFOUND`). `gitleaks`, `trivy`, and `grype` were unavailable. |
+| Secret-pattern scan | PASS, limited | Working tree/Git history candidate hits were limited to `.env.example`, README, and local setup instructions containing placeholder connection strings. `.env` is ignored and not tracked. Not a dedicated secret-scanner result. |
+| PostgreSQL / historical fixtures | PARTIAL | User-provided output confirms `agentarena_test` connectivity, four migrations up to date, Prisma validate/generate, auth/session, encrypted key, ownership and CRUD checks. Model evaluation assertion failed and is fixed in test code; remainder and historical snapshot are unverified. No database cleanup/retest was run. |
+| Dedicated Redis/BullMQ, live providers, Render | NOT VERIFIED | No isolated test Redis, live provider, or Render logs/config used. |
+
+The full suite emitted expected Redis-refused diagnostics from the offline queue fixture. No hosted Redis, production database, external provider, or submitted code was contacted/executed.
+
+## Security follow-up — 2026-11-21
+
+| Check | Result | Evidence / limit |
+|---|---|---|
+| Full `npm test` | PASS | Latest exit 0: Stage 3 19/19, Stage 4 8/8, Stage 5 9/9, Stage 6 6/6, Stage 7 9/9, Stage 8 23/23, plus Stage 9 auth/ownership/headers, Stage 10 Bifrost, provider mocks and model orchestration. |
+| DNS rebinding | PASS, fixture | A test resolver changes its answer after validation; the request uses the validated IP directly, and makes only one DNS lookup. Loopback is explicitly allowed only in this local test. TLS uses the original hostname for SNI/certificate checks by implementation; no public TLS provider was contacted. |
+| Agent/provider/Bifrost response limits | PASS, fixture | Chunked oversized agent, 2 MiB+ provider and Bifrost response fixtures are rejected/cancelled; generic errors do not include keys or response content. |
+| Prompt injection separation | PASS, fixture | Evaluator policy travels as a separate system message; adversarial strings remain JSON-encoded user data and cannot replace the system message. Schema/score separation tests pass. Model compliance itself cannot be guaranteed. |
+| Rate-limit coverage | PASS, unit/code | The existing 10/min limiter tests pass for IP and authenticated-account keys; expensive agent, run/evaluation routes now apply it. No Redis-backed distributed limit was exercised or implemented. |
+| Security headers | PASS, unit | Production CSP and HTTPS-only HSTS policy verified; CSP/HSTS are absent in development. No browser/Render runtime test was performed. |
+| `npm run lint`, Prisma validation, build, `git diff --check` | PASS | Build includes new server request transport and security headers. Vite emitted its existing non-blocking config-loader warning. |
+| PostgreSQL / Redis / live deployment | NOT TESTED | Explicitly skipped per request. No database integration, hosted Redis, provider calls, or Render access. |
+
+## Final pre-submission pass — 2026-11-21
+
+| Check | Result | Evidence / limit |
+|---|---|---|
+| `npm test` | PASS | Full Stage 3–10 suite exit 0 when local fixture networking was allowed. Initial restricted attempt failed Stage 3–4 loopback fixtures (`EACCES`); no application behavior was changed to accommodate the restriction. Offline BullMQ fallback checks logged expected localhost Redis refusal; no Redis integration was claimed. |
+| Lint/TypeScript, Prisma validation, production build | PASS | `npm run lint`, `npm run prisma:validate`, `npm run build`; existing Vite config-loader warning only. |
+| Navigation UI browser interaction | NOT VERIFIED | Drawer compiles; repository has no browser/DOM test runner. Keyboard, Escape, focus trap, backdrop, selection-close, and responsive controls are implemented, but not browser-automated. |
+| PostgreSQL integration | NOT VERIFIED | User reports local `agentarena_test` records. No connection attempted from this environment; preserve all existing audit fixtures. Earlier Windows integration run stopped at a test assertion; assertion/cleanup fix remains unrerun. |
+| Dedicated Redis/BullMQ, providers, Render | NOT VERIFIED | No disposable Redis, live provider call, or Render access. |

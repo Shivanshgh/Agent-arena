@@ -49,6 +49,11 @@ async function main() {
     }
     globalThis.fetch = async () => new Response('not-json', { status: 200 });
     await assert.rejects(() => new DeepSeekAdapter().listModels('hidden-key'), error => error instanceof ModelProviderError && /malformed/i.test(error.message));
+    globalThis.fetch = async () => new Response(new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(2 * 1024 * 1024 + 1)); controller.close(); },
+    }), { status: 200 });
+    await assert.rejects(() => new OpenAIAdapter().listModels('hidden-key'), error =>
+      error instanceof ModelProviderError && /size limit/i.test(error.message) && !error.message.includes('hidden-key'));
     globalThis.fetch = async (_input, init) => new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
     await assert.rejects(() => new GeminiAdapter().execute('hidden-key', 'm', 'p', 5), error => error instanceof ModelProviderError && error.statusCode === 504);
     let attempts = 0;

@@ -1,7 +1,13 @@
+import { readLimitedResponse } from '../limited-response';
+
+const MAX_BIFROST_RESPONSE_BYTES = 2 * 1024 * 1024;
+
 export interface BifrostRequest {
   provider: 'openai' | 'anthropic' | 'deepseek' | 'google' | 'custom';
   model: string;
   prompt: string;
+  /** Trusted evaluator policy sent separately from untrusted benchmark data. */
+  systemPrompt?: string;
   maxTokens?: number;
   temperature?: number;
   /** Internal bounded timeout override for tests; defaults to 30 seconds. */
@@ -59,6 +65,7 @@ export class BifrostGateway {
     const providers = ['openai', 'anthropic', 'deepseek', 'google', 'custom'];
     if (!request || !providers.includes(request.provider) || typeof request.model !== 'string' || !request.model.trim() || request.model.length > 200 ||
         typeof request.prompt !== 'string' || !request.prompt.trim() || request.prompt.length > 100_000 ||
+        (request.systemPrompt !== undefined && (typeof request.systemPrompt !== 'string' || !request.systemPrompt.trim() || request.systemPrompt.length > 4000)) ||
         (request.maxTokens !== undefined && (!Number.isInteger(request.maxTokens) || request.maxTokens < 1 || request.maxTokens > 8192)) ||
         (request.temperature !== undefined && (!Number.isFinite(request.temperature) || request.temperature < 0 || request.temperature > 2)) ||
         (request.timeoutMs !== undefined && (!Number.isInteger(request.timeoutMs) || request.timeoutMs < 1 || request.timeoutMs > 30_000))) {
@@ -94,7 +101,10 @@ export class BifrostGateway {
         },
         body: JSON.stringify({
           model: request.model,
-          messages: [{ role: 'user', content: request.prompt }],
+          messages: [
+            ...(request.systemPrompt ? [{ role: 'system', content: request.systemPrompt }] : []),
+            { role: 'user', content: request.prompt },
+          ],
           max_tokens: request.maxTokens || 2048,
           temperature: request.temperature ?? 0.2,
         }),
@@ -104,7 +114,7 @@ export class BifrostGateway {
       const durationMs = Math.round(performance.now() - start);
 
       if (!res.ok) {
-        await res.text();
+        await res.body?.cancel().catch(() => undefined);
         clearTimeout(timer);
         return {
           success: false,
@@ -117,9 +127,9 @@ export class BifrostGateway {
         };
       }
 
-      const payload = await res.text();
+      const { text: payload, exceeded } = await readLimitedResponse(res, MAX_BIFROST_RESPONSE_BYTES);
       clearTimeout(timer);
-      if (payload.length > 2_000_000) return { success: false, content: '', provider: request.provider, model: request.model, durationMs: Math.round(performance.now() - start), tokens: { inputTokens: null, outputTokens: null }, errorMessage: 'Bifrost response exceeded the size limit.' };
+      if (exceeded) return { success: false, content: '', provider: request.provider, model: request.model, durationMs: Math.round(performance.now() - start), tokens: { inputTokens: null, outputTokens: null }, errorMessage: 'Bifrost response exceeded the size limit.' };
       let data: any;
       try { data = JSON.parse(payload); } catch {
         return { success: false, content: '', provider: request.provider, model: request.model, durationMs: Math.round(performance.now() - start), tokens: { inputTokens: null, outputTokens: null }, errorMessage: 'Bifrost returned an invalid response.' };

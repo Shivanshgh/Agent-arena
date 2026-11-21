@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { authRateLimit, clearSessionCookie, cookieToken, createAuthMiddleware, hashPassword, setSessionCookie, verifyPassword } from '../server/auth';
 import { agentScope, runScope, taskReadScope, taskWriteScope } from '../server/ownership';
+import { setSecurityHeaders } from '../server/security-headers';
 
 async function run() {
   const password = 'long-enough-example-password';
@@ -45,6 +46,19 @@ async function run() {
   await middleware({ method: 'POST', path: '/auth/login', headers: {}, socket: { remoteAddress: '127.0.0.1' } } as any, originResponse, (() => {}) as any);
   assert.equal(originResponse.code, 403);
 
+  const collectHeaders = () => ({ values: new Map<string, string>(), setHeader(name: string, value: string) { this.values.set(name, value); } });
+  const productionHttps = collectHeaders();
+  setSecurityHeaders(productionHttps, { production: true, https: true });
+  assert.match(productionHttps.values.get('Content-Security-Policy') || '', /script-src 'self'/);
+  assert.equal(productionHttps.values.get('Strict-Transport-Security'), 'max-age=31536000');
+  const productionHttp = collectHeaders();
+  setSecurityHeaders(productionHttp, { production: true, https: false });
+  assert.equal(productionHttp.values.has('Strict-Transport-Security'), false);
+  assert.equal(productionHttp.values.has('Content-Security-Policy'), true);
+  const development = collectHeaders();
+  setSecurityHeaders(development, { production: false, https: false });
+  assert.equal(development.values.has('Content-Security-Policy'), false);
+
   const rateLimit = authRateLimit();
   let blocked = false;
   for (let index = 0; index < 11; index++) {
@@ -52,6 +66,13 @@ async function run() {
     rateLimit({ socket: { remoteAddress: 'test-auth-ip' } } as any, result, (() => {}) as any);
   }
   assert.equal(blocked, true);
+  const userRateLimit = authRateLimit();
+  let userBlocked = false;
+  for (let index = 0; index < 11; index++) {
+    const result: any = { setHeader() {}, status(code: number) { if (code === 429) userBlocked = true; return this; }, json() { return this; } };
+    userRateLimit({ authUser: { id: 'account-a' }, socket: { remoteAddress: `rotating-ip-${index}` } } as any, result, (() => {}) as any);
+  }
+  assert.equal(userBlocked, true, 'Authenticated costly actions remain rate limited across changing source IPs');
   console.log('Stage 9 authentication and ownership tests: PASS');
 }
 
