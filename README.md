@@ -1,6 +1,7 @@
 # AgentArena — AI Coding Agent Benchmark & Evaluation Arena
 
 AgentArena registers HTTP coding agents, runs shared benchmark tasks, stores executions, and compares results. It also supports optional direct model connections. **It does not execute submitted code against hidden tests**; code answers are marked unverified unless a task uses exact text/JSON comparison. Heuristic and optional AI-assisted reviews are not proof of correctness.
+LIVE LINK :- https://agent-arena-igk5.onrender.com
 
 ---
 
